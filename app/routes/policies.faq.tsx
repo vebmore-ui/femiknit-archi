@@ -1,0 +1,148 @@
+import { Link } from "@remix-run/react";
+
+const faqs = [
+  {
+    category: "Products & authenticity",
+    items: [
+      {
+        q: "Will my saree look exactly like the website photographs?",
+        a: "We aim to show colours and details accurately, but screens, lighting and photography can cause slight differences. Handcrafted sarees may also have natural variations that make each piece unique."
+      }
+    ]
+  },
+  {
+    category: "Orders & payments",
+    items: [
+      {
+        q: "Which payment methods do you accept?",
+        a: "The available options are shown at checkout and may include UPI, cards, net banking, wallets and Cash on Delivery."
+      },
+      {
+        q: "Is Cash on Delivery available?",
+        a: "COD may be offered for selected PIN codes and order values. Any applicable COD fee will be displayed before you pay."
+      },
+      {
+        q: "Is online payment secure?",
+        a: "Payments are processed through secure third-party payment providers. Femiknit does not store your complete card or banking credentials."
+      },
+      {
+        q: "Can I change my address or order?",
+        a: "Contact us immediately. We can attempt a change only before packing or dispatch, and it cannot be guaranteed."
+      },
+      {
+        q: "Can I cancel my order?",
+        a: "You may request cancellation before packing or dispatch. Once dispatched, the order must follow our Return, Refund & Exchange Policy. Customised work cannot be cancelled after processing begins."
+      }
+    ]
+  },
+  {
+    category: "Shipping & delivery",
+    items: [
+      {
+        q: "Do you deliver across India?",
+        a: "We deliver to most serviceable Indian PIN codes. Availability is confirmed at checkout."
+      },
+      {
+        q: "How long will delivery take?",
+        a: "The estimated dispatch and delivery window is displayed at checkout or on the product page. Sales, festivals, extreme weather and courier disruptions can cause delays."
+      },
+      {
+        q: "How can I track my order?",
+        a: "Tracking details are shared after dispatch by email, SMS or WhatsApp. Courier tracking can take up to 24 hours to update."
+      }
+    ]
+  },
+  {
+    category: "Returns, exchanges & refunds",
+    items: [
+      {
+        q: "In what condition must the saree be returned?",
+        a: "It must be unused, unworn, unwashed, un-ironed and unaltered, with tags and original packaging intact. It must be free from odour, stains, makeup, damage and signs of use. The blouse piece must remain uncut."
+      },
+      {
+        q: "Which items are non-returnable?",
+        a: "Altered or customised sarees, cut blouse pieces, made-to-order items, final-sale products, gift cards, and used or damaged items are not returnable for preference reasons. Verified defective or incorrect goods are handled separately."
+      },
+      {
+        q: "What if I receive a damaged, defective, incorrect or incomplete order?",
+        a: "Contact us within 48 hours with your order number, photographs and any available unboxing video. After verification, we will offer an appropriate replacement, exchange or full refund without charging reverse shipping."
+      },
+      {
+        q: "Is an unboxing video compulsory?",
+        a: "It is strongly recommended and helps with tampering, damage, wrong-item and missing-item claims. We may request it where reasonably necessary, but we will consider other reliable evidence and comply with applicable consumer law."
+      },
+      {
+        q: "How do I start a return or exchange?",
+        a: "Email [support email] or WhatsApp [WhatsApp number] within the applicable period. Send your order number, item, reason and supporting evidence, then wait for approval and return instructions."
+      },
+      {
+        q: "Who pays return shipping?",
+        a: "A ₹199 reverse-shipping and handling charge applies to an approved preference return or exchange. Femiknit bears reasonable return shipping for a verified damaged, defective, missing or incorrect item."
+      },
+      {
+        q: "Can I exchange a saree?",
+        a: "One exchange is available for an eligible item, subject to stock and inspection. A ₹199 charge applies to a preference exchange and is waived for a verified Femiknit error."
+      },
+      {
+        q: "When will I receive my refund?",
+        a: "We normally initiate it within 5–7 business days after the return passes inspection. The bank or payment provider may then take another 5–10 business days to post the credit."
+      },
+      {
+        q: "Can I choose store credit?",
+        a: "Yes. For an approved preference return, store credit covers the approved product value without the ₹199 return-handling deduction. It is valid for 12 months and cannot be redeemed for cash."
+      },
+      {
+        q: "Are shipping, COD and service charges refundable?",
+        a: "These charges are generally non-refundable for preference returns. They will be appropriately refunded where the return results from a verified Femiknit error or where the law requires it."
+      },
+      {
+        q: "Can I return a sale product?",
+        a: "Check the product page and offer terms. Items marked Final Sale, Clearance or Non-returnable cannot be returned for preference reasons."
+      }
+    ]
+  },
+  {
+    category: "Support",
+    items: [
+      {
+        q: "How do I contact Femiknit?",
+        a: "Email [support email] or WhatsApp [WhatsApp number] during [support days and timings]. Include your order number for faster assistance."
+      }
+    ]
+  }
+];
+
+export default function FAQ() {
+  return (
+    <div className="min-h-screen bg-white">
+      <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
+        <div className="mb-10">
+          <h1 className="font-serif text-3xl text-rose-950 sm:text-4xl">Frequently Asked Questions</h1>
+          <p className="mt-2 text-sm text-gray-500">Last updated: 1 August 2026</p>
+        </div>
+
+        <div className="prose prose-rose prose-lg max-w-none space-y-10">
+          {faqs.map((group) => (
+            <section key={group.category}>
+              <h2 className="font-serif text-xl text-rose-900">{group.category}</h2>
+              <div className="mt-4 space-y-6">
+                {group.items.map((item) => (
+                  <div key={item.q}>
+                    <h3 className="font-semibold text-gray-900">{item.q}</h3>
+                    <p className="mt-1 text-gray-700 leading-relaxed">{item.a}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
+
+          <div className="mt-10">
+            <Link to="/" className="inline-flex items-center rounded-full bg-rose-800 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-900">
+              Back to shop
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
