@@ -1,5 +1,5 @@
 import { json } from "@remix-run/node";
-import { getSupabaseServerClient } from "@/lib/supabase.server";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 export async function action({ request }: { request: Request }) {
   if (request.method !== "POST") {
