@@ -1,0 +1,4 @@
+name = "femiknit"
+compatibility_date = "2024-03-01"
+main = "build/server/index.js"
+assets = { binding = "ASSETS", directory = "build/client" }
