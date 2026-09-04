@@ -5,6 +5,7 @@ import { Header } from "@/components/Header";
 import { HeroCarousel } from "@/components/HeroCarousel";
 import { MandalaDivider } from "@/components/Motifs";
 import { FAQSection } from "@/components/FAQSection";
+import { WhatsAppUpdatesSection } from "@/components/WhatsAppUpdatesSection";
 import { GenderProductShowcase } from "@/components/GenderProductShowcase";
 import { TrustBadges } from "@/components/TrustBadges";
 import { FloatingCart } from "@/components/FloatingCart";
@@ -54,6 +55,7 @@ export default function Home() {
       <AgeGroupSection />
       <FestiveFeature />
       <TrustBadges />
+      <WhatsAppUpdatesSection />
       <FAQSection />
       <Footer />
       <FloatingCart />
