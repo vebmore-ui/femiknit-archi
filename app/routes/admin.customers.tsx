@@ -3,8 +3,7 @@ import { motion, AnimatePresence, Variants } from "framer-motion";
 import { 
   Search, Users, Mail, Phone, 
   MapPin, ShoppingBag, Eye, X, 
-  Download, Calendar, CheckSquare, Square, 
-  ArrowUpDown, RefreshCw, CheckCircle, ShieldCheck
+  Calendar, ArrowUpDown, RefreshCw, CheckCircle, ShieldCheck
 } from "lucide-react";
 import styles from "../admin/customers/page.module.css";
 
@@ -42,8 +41,7 @@ export default function CustomerManagement() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [tierFilter, setTierFilter] = useState("All");
-  const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -72,23 +70,6 @@ export default function CustomerManagement() {
     loadCustomers();
   }, []);
 
-  const toggleSelectAll = () => {
-    if (selectedCustomerIds.length === filteredCustomers.length) {
-      setSelectedCustomerIds([]);
-    } else {
-      setSelectedCustomerIds(filteredCustomers.map(c => c.id));
-    }
-  };
-
-  const toggleSelectCustomer = (id: string) => {
-    setSelectedCustomerIds(prev => 
-      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
-    );
-  };
-
-  const handleExportCSV = () => {
-    showToast("Customer directory exported as CSV successfully.");
-  };
 
   const filteredCustomers = useMemo(() => {
     return customers.filter(customer => {
@@ -136,9 +117,6 @@ export default function CustomerManagement() {
         <div className={styles.headerActions}>
           <button onClick={() => window.location.reload()} className={styles.btnSecondary} title="Sync Records">
             <RefreshCw size={16} /> Sync
-          </button>
-          <button onClick={handleExportCSV} className={styles.btnPrimary}>
-            <Download size={16} /> Export CSV
           </button>
         </div>
       </div>
@@ -191,38 +169,12 @@ export default function CustomerManagement() {
         </div>
       </div>
 
-      {/* Bulk Action Bar */}
-      <AnimatePresence>
-        {selectedCustomerIds.length > 0 && (
-          <motion.div 
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className={styles.bulkBar}
-          >
-            <span className={styles.bulkText}><b>{selectedCustomerIds.length}</b> customers selected</span>
-            <button onClick={() => showToast(`Sent bulk email blast to ${selectedCustomerIds.length} users`)} className={styles.bulkActionBtn}>
-              Send Announcement Email
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Customers Table */}
       <div className={styles.card}>
         <div className={styles.tableWrapper}>
           <table className={styles.table}>
             <thead>
               <tr>
-                <th style={{ width: '40px' }}>
-                  <button onClick={toggleSelectAll} className={styles.checkboxBtn}>
-                    {selectedCustomerIds.length > 0 && selectedCustomerIds.length === filteredCustomers.length ? (
-                      <CheckSquare size={16} />
-                    ) : (
-                      <Square size={16} />
-                    )}
-                  </button>
-                </th>
                 <th>Customer Profile</th>
                 <th>Contact Details</th>
                 <th>Joined Date</th>
@@ -231,16 +183,10 @@ export default function CustomerManagement() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={5} style={{ textAlign: "center", padding: "2rem", color: "#64748b" }}>Loading customers...</td></tr>
+                <tr><td colSpan={4} style={{ textAlign: "center", padding: "2rem", color: "#64748b" }}>Loading customers...</td></tr>
               ) : filteredCustomers.map((customer) => {
-                const isSelected = selectedCustomerIds.includes(customer.id);
                 return (
-                  <tr key={customer.id} className={isSelected ? styles.selectedRow : ""}>
-                    <td>
-                      <button onClick={() => toggleSelectCustomer(customer.id)} className={styles.checkboxBtn}>
-                        {isSelected ? <CheckSquare size={16} /> : <Square size={16} />}
-                      </button>
-                    </td>
+                  <tr key={customer.id}>
                     <td>
                       <div className={styles.customerInfo}>
                         <div className={styles.avatar}>
@@ -275,7 +221,7 @@ export default function CustomerManagement() {
               })}
               {!loading && filteredCustomers.length === 0 && (
                 <tr>
-                  <td colSpan={5} style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
+                  <td colSpan={4} style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
                     <p style={{ margin: 0, fontWeight: 500 }}>No matching customer records discovered.</p>
                   </td>
                 </tr>

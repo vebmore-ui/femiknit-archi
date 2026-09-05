@@ -780,62 +780,42 @@ export default function ProductManagement() {
 
                 {/* Right Column: Taxonomy */}
                 <div>
-                  <div className={`${styles.card} ${styles.cardPadding}`}>
-                    <h2 className={styles.cardTitle}><Tag size={18} color="#64748b" /> Catalog Taxonomy</h2>
+                   <div className={`${styles.card} ${styles.cardPadding}`}>
+                     <h2 className={styles.cardTitle}><Tag size={18} color="#64748b" /> Catalog Taxonomy</h2>
 
-                    <div className={styles.inputGroup}>
-                      <label className={styles.label}>Category</label>
-                      <select
-                        className={styles.select}
-                        value={formCategory}
-                        onChange={(e) => {
-                          setFormCategory(e.target.value);
-                          if (e.target.value === "Sarees" || e.target.value === "Kurtis") {
-                            setFormGender("Women");
-                          } else if (e.target.value === "Kids Wear") {
-                            setFormGender("Unisex");
-                          }
-                        }}
-                      >
-                        <option value="Sarees">Sarees</option>
-                        <option value="Kurtis">Kurtis</option>
-                        <option value="Kids Wear">Kids Wear</option>
-                      </select>
-                    </div>
-
-                    <div className={styles.inputGroup}>
-                      <label className={styles.label}>Fabric Type</label>
-                      <select
-                        className={styles.select}
-                        value={formGender}
-                        onChange={(e) => setFormGender(e.target.value)}
-                      >
-                        <option value="Silk">Silk</option>
-                        <option value="Cotton">Cotton</option>
-                        <option value="Khadi">Khadi</option>
-                        <option value="Mulmul">Mulmul</option>
-                        <option value="Organza">Organza</option>
-                        <option value="Chanderi">Chanderi</option>
-                        <option value="Mangalagiri">Mangalagiri</option>
-                        <option value="Kantha Stitch">Kantha Stitch</option>
-                        <option value="Chikankari Stitch">Chikankari Stitch</option>
-                        <option value="Kani Pashmina">Kani Pashmina</option>
-                        <option value="Kalakshetra">Kalakshetra</option>
-                        <option value="Baluchari">Baluchari</option>
-                        <option value="Gorod">Gorod</option>
-                        <option value="Banarasi">Banarasi</option>
-                        <option value="Georgette">Georgette</option>
-                        <option value="Chiffon">Chiffon</option>
-                        <option value="Ajrakh">Ajrakh</option>
-                        <option value="Sequi">Sequi</option>
-                      </select>
-                    </div>
-                  </div>
+                     <div className={styles.inputGroup}>
+                       <label className={styles.label}>Categories</label>
+                       <select
+                         className={styles.select}
+                         value={formGender}
+                         onChange={(e) => setFormGender(e.target.value)}
+                       >
+                         <option value="Silk">Silk</option>
+                         <option value="Cotton">Cotton</option>
+                         <option value="Khadi">Khadi</option>
+                         <option value="Mulmul">Mulmul</option>
+                         <option value="Organza">Organza</option>
+                         <option value="Chanderi">Chanderi</option>
+                         <option value="Mangalagiri">Mangalagiri</option>
+                         <option value="Kantha Stitch">Kantha Stitch</option>
+                         <option value="Chikankari Stitch">Chikankari Stitch</option>
+                         <option value="Kani Pashmina">Kani Pashmina</option>
+                         <option value="Kalakshetra">Kalakshetra</option>
+                         <option value="Baluchari">Baluchari</option>
+                         <option value="Gorod">Gorod</option>
+                         <option value="Banarasi">Banarasi</option>
+                         <option value="Georgette">Georgette</option>
+                         <option value="Chiffon">Chiffon</option>
+                         <option value="Ajrakh">Ajrakh</option>
+                         <option value="Sequi">Sequi</option>
+                       </select>
+                     </div>
+                   </div>
 
                   <div className={`${styles.card} ${styles.cardPadding}`} style={{ marginTop: '1.25rem' }}>
                     <h2 className={styles.cardTitle}>Quick Tips</h2>
                     <ul className={styles.tipList}>
-                      <li>Select the correct <strong>Fabric Type</strong> for accurate cataloging</li>
+                      <li>Select the correct <strong>Categories</strong> for accurate cataloging</li>
                       <li>Add at least one variant with size, color, and stock</li>
                       <li>Upload up to 3 product images</li>
                       <li>Use descriptive product names for better search visibility</li>

@@ -39,7 +39,6 @@ type Product = {
 
 type Filters = {
   query: string;
-  category: string;
   fabricType: string;
   size: string;
   color: string;
@@ -49,7 +48,6 @@ type Filters = {
 
 const initialFilters: Filters = {
   query: "",
-  category: "All",
   fabricType: "All",
   size: "All",
   color: "All",
@@ -313,11 +311,6 @@ export function GenderProductShowcase() {
     return products;
   }, [products]);
 
-  const availableCategories = useMemo(() => {
-    const cats = Array.from(new Set(allProducts.map((p) => p.category)));
-    return ["All", ...cats];
-  }, [allProducts]);
-
   const availableFabricTypes = useMemo(() => {
     return ["All", ...fabricTypes];
   }, []);
@@ -342,13 +335,12 @@ export function GenderProductShowcase() {
         product.title.toLowerCase().includes(query) ||
         product.category.toLowerCase().includes(query);
 
-      const matchesCategory = filters.category === "All" || bp?.category === filters.category;
       const matchesFabricType = filters.fabricType === "All" || bp?.gender === filters.fabricType;
       const matchesSize = filters.size === "All" || product.size.includes(filters.size);
       const matchesColor = filters.color === "All" || product.colors.some((color) => color.name === filters.color);
       const matchesPrice = product.price <= filters.price;
 
-      return matchesQuery && matchesCategory && matchesFabricType && matchesSize && matchesColor && matchesPrice;
+      return matchesQuery && matchesFabricType && matchesSize && matchesColor && matchesPrice;
     });
 
     if (filters.sortBy === "Featured") {
@@ -367,7 +359,6 @@ export function GenderProductShowcase() {
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (filters.query) count++;
-    if (filters.category !== "All") count++;
     if (filters.fabricType !== "All") count++;
     if (filters.size !== "All") count++;
     if (filters.color !== "All") count++;
@@ -434,14 +425,13 @@ export function GenderProductShowcase() {
                 <Search size={17} className="text-gray-400" />
                 <input
                   className="min-w-0 flex-1 bg-transparent px-2 text-sm outline-none"
-                  placeholder="Keyword search"
-                  value={filters.query}
-                  onChange={(event) => setFilters({ ...filters, query: event.target.value })}
-                />
-              </label>
+                   placeholder="Keyword search"
+                   value={filters.query}
+                   onChange={(event) => setFilters({ ...filters, query: event.target.value })}
+                 />
+               </label>
 
-               <FilterSelect label="Category" value={filters.category} options={availableCategories} onChange={(category) => setFilters({ ...filters, category })} />
-               <FilterSelect label="Fabric Type" value={filters.fabricType} options={availableFabricTypes} onChange={(fabricType) => setFilters({ ...filters, fabricType })} />
+                <FilterSelect label="Categories" value={filters.fabricType} options={availableFabricTypes} onChange={(fabricType) => setFilters({ ...filters, fabricType })} />
                <FilterSelect label="Size" value={filters.size} options={availableSizes} onChange={(size) => setFilters({ ...filters, size })} />
                <FilterSelect label="Color" value={filters.color} options={availableColors} onChange={(color) => setFilters({ ...filters, color })} />
 
@@ -466,14 +456,8 @@ export function GenderProductShowcase() {
                {activeFilterCount > 0 && (
                  <div className="mt-5">
                    <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-700">Active Filters</p>
-                   <div className="flex flex-wrap gap-2">
-                     {filters.category !== "All" && (
-                       <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
-                         {filters.category}
-                         <button onClick={() => removeFilter("category", filters.category)} className="hover:text-amber-900"><X size={12} /></button>
-                       </span>
-                     )}
-                     {filters.fabricType !== "All" && (
+                    <div className="flex flex-wrap gap-2">
+                      {filters.fabricType !== "All" && (
                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
                          {filters.fabricType}
                          <button onClick={() => removeFilter("fabricType", filters.fabricType)} className="hover:text-amber-900"><X size={12} /></button>
@@ -598,18 +582,7 @@ export function GenderProductShowcase() {
                 </button>
               </div>
 
-              <label className="flex items-center rounded-xl border border-gray-200 px-3 py-2.5 mb-4">
-                <Search size={17} className="text-gray-400" />
-                <input
-                  className="min-w-0 flex-1 bg-transparent px-2 text-sm outline-none"
-                  placeholder="Search products..."
-                  value={filters.query}
-                  onChange={(event) => setFilters({ ...filters, query: event.target.value })}
-                />
-              </label>
-
-               <FilterSelect label="Category" value={filters.category} options={availableCategories} onChange={(category) => setFilters({ ...filters, category })} />
-               <FilterSelect label="Fabric Type" value={filters.fabricType} options={availableFabricTypes} onChange={(fabricType) => setFilters({ ...filters, fabricType })} />
+                <FilterSelect label="Categories" value={filters.fabricType} options={availableFabricTypes} onChange={(fabricType) => setFilters({ ...filters, fabricType })} />
                <FilterSelect label="Size" value={filters.size} options={availableSizes} onChange={(size) => setFilters({ ...filters, size })} />
                <FilterSelect label="Color" value={filters.color} options={availableColors} onChange={(color) => setFilters({ ...filters, color })} />
 

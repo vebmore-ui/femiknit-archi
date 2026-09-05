@@ -102,10 +102,6 @@ export default function DashboardHome() {
         className={styles.header}
       >
         <div>
-          <div className={styles.badgeWrapper}>
-            <span className={styles.liveIndicator} />
-            <span>Store Performance Active</span>
-          </div>
           <h1 className={styles.title}>Dashboard</h1>
         </div>
 

@@ -1,4 +1,4 @@
-import { getSupabaseServerClient } from "./supabase.server";
+import { getSupabaseServerClient } from "./supabase-server";
 import { createClient } from "@supabase/supabase-js";
 
 export type ProductVariant = {
