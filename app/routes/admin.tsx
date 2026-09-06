@@ -15,8 +15,6 @@ import {
   Users,
   Settings,
   Lock,
-  Mail,
-  Key,
   ArrowRight,
   LogOut,
   X,
@@ -25,20 +23,22 @@ import {
 import { json, type LoaderFunctionArgs, type ActionFunctionArgs } from "@remix-run/node";
 import { serialize } from "cookie";
 import { motion, AnimatePresence, type Variants } from "framer-motion";
-import { sendAdminOtpEmail } from "@/lib/nodemailer";
-import {
-  generateAndStoreOtp,
-  verifyAndConsumeOtp,
-  createSession,
-  validateSession,
-  destroySession,
-  SESSION_EXPIRY_MS,
-} from "@/lib/otp-store";
 import styles from "../admin/layout.module.css";
 
-const OWNER_EMAIL =
-  process.env.OWNER_EMAIL || "owner@example.com";
 const ADMIN_SESSION_COOKIE = "femiknit_admin_session";
+const SESSION_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000;
+
+function getOwnerEmail(): string {
+  return process.env.OWNER_EMAIL || "owner@example.com";
+}
+
+function getAdminPassword(): string | undefined {
+  return process.env.ADMIN_PASSWORD;
+}
+
+function getAdminSessionSecret(): string | undefined {
+  return process.env.ADMIN_SESSION_SECRET;
+}
 
 const chrome404HTML = `<!DOCTYPE html>
 <html lang="en">
@@ -84,9 +84,6 @@ type LoaderData = {
 
 type ActionData = {
   error?: string;
-  otpRequested?: boolean;
-  email?: string;
-  otp?: string;
 };
 
 function parseCookies(
@@ -111,6 +108,7 @@ function setSessionCookie(token: string): string {
     httpOnly: true,
     maxAge: SESSION_EXPIRY_MS,
     path: "/",
+    sameSite: "lax",
   });
 }
 
@@ -119,7 +117,90 @@ function clearSessionCookie(): string {
     httpOnly: true,
     maxAge: 0,
     path: "/",
+    sameSite: "lax",
   });
+}
+
+function base64urlEncode(data: Uint8Array): string {
+  const base64 = btoa(String.fromCharCode(...data));
+  return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function base64urlDecode(str: string): Uint8Array {
+  let base64 = str.replace(/-/g, "+").replace(/_/g, "/");
+  while (base64.length % 4) base64 += "=";
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+async function getSigningKey(): Promise<CryptoKey | null> {
+  if (!getAdminSessionSecret()) return null;
+  const encoder = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(getAdminSessionSecret()),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign", "verify"]
+  );
+  return keyMaterial;
+}
+
+async function signSession(email: string): Promise<string> {
+  const key = await getSigningKey();
+  if (!key) throw new Error("ADMIN_SESSION_SECRET is not configured");
+
+  const payload = {
+    email,
+    exp: Date.now() + SESSION_EXPIRY_MS,
+  };
+
+  const encoder = new TextEncoder();
+  const payloadBytes = encoder.encode(JSON.stringify(payload));
+  const payloadB64 = base64urlEncode(payloadBytes);
+
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    encoder.encode(payloadB64)
+  );
+
+  return payloadB64 + "." + base64urlEncode(new Uint8Array(signature));
+}
+
+async function verifySession(token: string): Promise<string | null> {
+  const key = await getSigningKey();
+  if (!key) return null;
+
+  try {
+    const [payloadB64, signatureB64] = token.split(".");
+    if (!payloadB64 || !signatureB64) return null;
+
+    const encoder = new TextEncoder();
+    const signatureBytes = base64urlDecode(signatureB64);
+
+    const valid = await crypto.subtle.verify(
+      "HMAC",
+      key,
+      signatureBytes.buffer.slice(signatureBytes.byteOffset, signatureBytes.byteOffset + signatureBytes.byteLength) as ArrayBuffer,
+      encoder.encode(payloadB64)
+    );
+
+    if (!valid) return null;
+
+    const payloadBytes = base64urlDecode(payloadB64);
+    const payload = JSON.parse(new TextDecoder().decode(payloadBytes)) as { email: string; exp: number };
+
+    if (Date.now() > payload.exp) return null;
+
+    return payload.email;
+  } catch {
+    return null;
+  }
 }
 
 function notFoundResponse(): Response {
@@ -133,9 +214,9 @@ function notFoundResponse(): Response {
 export async function loader({ request }: LoaderFunctionArgs) {
   const cookies = parseCookies(request.headers.get("cookie"));
   const sessionToken = cookies[ADMIN_SESSION_COOKIE];
-  const sessionEmail = sessionToken ? validateSession(sessionToken) : null;
+  const sessionEmail = sessionToken ? await verifySession(sessionToken) : null;
 
-  const isAuthenticated = sessionEmail === OWNER_EMAIL;
+  const isAuthenticated = sessionEmail === getOwnerEmail();
 
   return json({
     isAuthenticated,
@@ -145,63 +226,32 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData();
-  const phase = formData.get("phase")?.toString() || "request";
-  const email = (formData.get("email")?.toString() || "").trim();
+  const phase = formData.get("phase")?.toString() || "login";
 
-  if (phase === "request") {
-    if (!email) {
-      return json({ error: "Please enter your email address." });
+  if (phase === "login") {
+    const password = formData.get("password")?.toString() || "";
+
+    if (!password) {
+      return json({ error: "Please enter your password." });
     }
 
-    if (email !== OWNER_EMAIL) {
-      return json({ error: "This email is not authorized for admin access." });
+    if (!getAdminPassword()) {
+      return json({ error: "Admin authentication is not configured." }, { status: 500 });
     }
 
-    const otp = generateAndStoreOtp(email);
-
-    try {
-      await sendAdminOtpEmail(email, otp);
-    } catch (err) {
-      console.error("Failed to send admin OTP email:", err);
-      const detail = err instanceof Error ? err.message : String(err);
-      return json({ error: `Failed to send verification code: ${detail}` });
+    if (password !== getAdminPassword()) {
+      return json({ error: "Invalid credentials." }, { status: 401 });
     }
 
-    return json({ otpRequested: true, email });
-  }
+    const token = await signSession(getOwnerEmail());
 
-  if (phase === "verify") {
-    const otp = (formData.get("otp")?.toString() || "").trim();
-    const storedEmail = formData.get("email")?.toString() || "";
-
-    if (!otp || otp.length !== 6) {
-      return json({
-        error: "Please enter the 6-digit code.",
-        otpRequested: true,
-        email: storedEmail,
-      });
-    }
-
-    if (!verifyAndConsumeOtp(storedEmail, otp)) {
-      return json(
-        { error: "Invalid or expired verification code. Please request a new code.", otpRequested: true, email: storedEmail },
-        { status: 400 }
-      );
-    }
-
-    const sessionToken = createSession(storedEmail);
     const headers = new Headers();
-    headers.append("Set-Cookie", setSessionCookie(sessionToken));
+    headers.append("Set-Cookie", setSessionCookie(token));
     headers.set("Location", "/admin");
     return new Response(null, { status: 302, headers });
   }
 
   if (phase === "logout") {
-    const cookies = parseCookies(request.headers.get("cookie"));
-    const sessionToken = cookies[ADMIN_SESSION_COOKIE];
-    if (sessionToken) {
-      destroySession(sessionToken);
-    }
     const headers = new Headers();
     headers.append("Set-Cookie", clearSessionCookie());
     headers.set("Location", "/admin");
@@ -238,316 +288,34 @@ function AdminLogin() {
   const actionData = useActionData<ActionData>();
   const submit = useSubmit();
   const navigation = useNavigation();
-  const [emailInput, setEmailInput] = useState("");
-  const [otpInput, setOtpInput] = useState("");
-  const [resendCountdown, setResendCountdown] = useState(0);
+  const [password, setPassword] = useState("");
 
   const isSubmitting = navigation.state === "submitting";
 
-  useEffect(() => {
-    if (resendCountdown > 0) {
-      const timer = setTimeout(() => setResendCountdown(resendCountdown - 1), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [resendCountdown]);
-
-  useEffect(() => {
-    if (actionData?.otpRequested) {
-      setResendCountdown(30);
-      setOtpInput("");
-    }
-  }, [actionData?.otpRequested]);
-
-  const handleRequestOtp = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!emailInput.trim()) return;
+    if (!password.trim()) return;
     const form = e.currentTarget as HTMLFormElement;
     const formData = new FormData(form);
-    formData.set("email", emailInput.trim());
+    formData.set("password", password.trim());
     submit(formData, { method: "post" });
   };
-
-  const handleVerifyOtp = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (otpInput.length !== 6) return;
-    const form = e.currentTarget as HTMLFormElement;
-    const formData = new FormData(form);
-    formData.set("otp", otpInput.trim());
-    submit(formData, { method: "post" });
-  };
-
-  const handleOtpChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/\D/g, "").slice(0, 6);
-    setOtpInput(value);
-  };
-
-  const handleRequestNewCode = () => {
-    if (resendCountdown > 0 || isSubmitting) return;
-    const formData = new FormData();
-    formData.set("phase", "request");
-    formData.set("email", actionData?.email || emailInput.trim());
-    submit(formData, { method: "post" });
-  };
-
-  if (actionData?.otpRequested) {
-    return (
-      <AnimatePresence>
-        <motion.div
-          key="verify"
-          variants={formVariants}
-          initial="hidden"
-          animate="visible"
-          exit="exit"
-          style={{
-            width: "100%",
-            maxWidth: "420px",
-            margin: "0 auto",
-            padding: "2.5rem",
-            backgroundColor: "#ffffff",
-            borderRadius: "16px",
-            boxShadow: "0 20px 60px rgba(0, 0, 0, 0.12)",
-          }}
-        >
-          <motion.div
-            variants={itemVariants}
-            style={{ textAlign: "center", marginBottom: "2rem" }}
-          >
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.2, duration: 0.5, type: "spring", stiffness: 200 }}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: "64px",
-                height: "64px",
-                borderRadius: "50%",
-                backgroundColor: "#f0fdf4",
-                color: "#16a34a",
-                marginBottom: "1rem",
-              }}
-            >
-              <Key size={28} />
-            </motion.div>
-            <h1 style={{ fontSize: "1.5rem", fontWeight: 600, color: "#0f172a", margin: 0 }}>
-              Verify Your Identity
-            </h1>
-            <p
-              style={{
-                fontSize: "0.875rem",
-                color: "#64748b",
-                marginTop: "0.5rem",
-              }}
-            >
-              Enter the 6-digit code sent to {actionData.email}
-            </p>
-          </motion.div>
-
-          <form method="post" onSubmit={handleVerifyOtp}>
-            <input type="hidden" name="phase" value="verify" />
-            <input type="hidden" name="email" value={actionData.email || ""} />
-
-            <motion.div variants={itemVariants}>
-              <label
-                htmlFor="otp"
-                style={{
-                  display: "block",
-                  fontSize: "0.875rem",
-                  fontWeight: 500,
-                  color: "#334155",
-                  marginBottom: "0.75rem",
-                }}
-              >
-                Verification Code
-              </label>
-              <input
-                id="otp"
-                type="text"
-                name="otp"
-                value={otpInput}
-                onChange={handleOtpChange}
-                placeholder="Enter 6-digit code"
-                maxLength={6}
-                autoComplete="one-time-code"
-                style={{
-                  width: "100%",
-                  padding: "1.25rem 1.5rem",
-                  fontSize: "1.5rem",
-                  fontWeight: 500,
-                  textAlign: "center",
-                  letterSpacing: "0.5rem",
-                  border: `2px solid ${
-                    actionData?.error ? "#fca5a5" : "#e2e8f0"
-                  }`,
-                  borderRadius: "12px",
-                  outline: "none",
-                  transition: "all 0.2s ease",
-                  boxSizing: "border-box",
-                  fontFamily: "monospace",
-                }}
-                onFocus={(e) => {
-                  e.target.style.borderColor = "#38bdf8";
-                  e.target.style.boxShadow = "0 0 0 3px rgba(56, 189, 248, 0.2)";
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = actionData?.error ? "#fca5a5" : "#e2e8f0";
-                  e.target.style.boxShadow = "none";
-                }}
-              />
-            </motion.div>
-
-            <AnimatePresence>
-              {actionData?.error && (
-                <motion.div
-                  initial={{ opacity: 0, y: -8, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -8, scale: 0.95 }}
-                  transition={{ type: "spring", stiffness: 400, damping: 20 }}
-                  style={{
-                    background: "#fef2f2",
-                    border: "1px solid #fecaca",
-                    color: "#dc2626",
-                    fontSize: "0.875rem",
-                    padding: "0.875rem 1rem",
-                    borderRadius: "10px",
-                    marginTop: "1rem",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.5rem",
-                  }}
-                >
-                  <X size={16} />
-                  {actionData.error}
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <motion.div variants={itemVariants} style={{ marginTop: "1.5rem" }}>
-              <button
-                type="submit"
-                disabled={otpInput.length !== 6 || isSubmitting}
-                style={{
-                  width: "100%",
-                  padding: "1rem 1.5rem",
-                  fontSize: "1.125rem",
-                  fontWeight: 500,
-                  color: "#ffffff",
-                  backgroundColor:
-                    otpInput.length === 6 && !isSubmitting ? "#0f172b" : "#94a3bc",
-                  border: "none",
-                  borderRadius: "12px",
-                  cursor: otpInput.length === 6 && !isSubmitting ? "pointer" : "default",
-                  transition: "all 0.2s ease",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "0.5rem",
-                }}
-                onMouseEnter={(e) => {
-                  if (otpInput.length === 6 && !isSubmitting) {
-                    e.currentTarget.style.backgroundColor = "#1e293b";
-                    e.currentTarget.style.transform = "translateY(-1px)";
-                    e.currentTarget.style.boxShadow =
-                      "0 4px 20px rgba(15, 23, 42, 0.3)";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (otpInput.length === 6 && !isSubmitting) {
-                    e.currentTarget.style.backgroundColor = "#0f172b";
-                    e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow = "none";
-                  }
-                }}
-              >
-                {isSubmitting ? (
-                  <>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "spin 0.8s linear infinite" }}><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
-                    Verifying...
-                  </>
-                ) : (
-                  <>
-                    Sign In to Admin
-                    <ArrowRight size={20} />
-                  </>
-                )}
-              </button>
-            </motion.div>
-          </form>
-
-          <motion.div
-            variants={itemVariants}
-            style={{ marginTop: "1.5rem", textAlign: "center" }}
-          >
-            {resendCountdown > 0 ? (
-              <div
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                  color: "#94a3bc",
-                  fontSize: "0.9rem",
-                }}
-              >
-                <RefreshCw size={16} />
-                Resend in {resendCountdown}s
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={handleRequestNewCode}
-                disabled={isSubmitting}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "#64748b",
-                  fontSize: "0.875rem",
-                  cursor: isSubmitting ? "default" : "pointer",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "0.25rem",
-                  padding: "0.5rem 1rem",
-                  borderRadius: "8px",
-                  transition: "all 0.2s ease",
-                }}
-                onMouseEnter={(e) => {
-                  if (!isSubmitting) {
-                    e.currentTarget.style.color = "#0f172a";
-                    e.currentTarget.style.backgroundColor = "#f1f5f9";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isSubmitting) {
-                    e.currentTarget.style.color = "#64748b";
-                    e.currentTarget.style.backgroundColor = "transparent";
-                  }
-                }}
-              >
-                <RefreshCw size={14} />
-                Request new code
-              </button>
-            )}
-          </motion.div>
-        </motion.div>
-      </AnimatePresence>
-    );
-  }
 
   return (
     <AnimatePresence>
       <motion.div
-        key="email"
+        key="login"
         variants={formVariants}
         initial="hidden"
         animate="visible"
         exit="exit"
         style={{
           width: "100%",
-          maxWidth: "440px",
+          maxWidth: "420px",
           margin: "0 auto",
-          padding: "3rem",
+          padding: "2.5rem",
           backgroundColor: "#ffffff",
-          borderRadius: "20px",
+          borderRadius: "16px",
           boxShadow: "0 20px 60px rgba(0, 0, 0, 0.12)",
         }}
       >
@@ -591,16 +359,16 @@ function AdminLogin() {
               marginTop: "0.5rem",
             }}
           >
-            Enter your admin email to receive a verification code
+            Enter the admin password to continue
           </p>
         </motion.div>
 
-        <form method="post" onSubmit={handleRequestOtp}>
-          <input type="hidden" name="phase" value="request" />
+        <form method="post" onSubmit={handleSubmit}>
+          <input type="hidden" name="phase" value="login" />
 
           <motion.div variants={itemVariants}>
             <label
-              htmlFor="email"
+              htmlFor="password"
               style={{
                 display: "block",
                 fontSize: "0.875rem",
@@ -609,23 +377,23 @@ function AdminLogin() {
                 marginBottom: "0.75rem",
               }}
             >
-              Admin Email
+              Password
             </label>
             <div style={{ position: "relative" }}>
               <input
-                id="email"
-                type="email"
-                name="email"
-                value={emailInput}
-                onChange={(e) => setEmailInput(e.target.value)}
-                placeholder="admin@example.com"
+                id="password"
+                type="password"
+                name="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter admin password"
                 required
-                autoComplete="email"
+                autoComplete="current-password"
                 style={{
                   width: "100%",
                   padding: "1.25rem 1.5rem 1.25rem 3.5rem",
                   fontSize: "1.25rem",
-                  border: `2px solid ${actionData?.error ? "#fca5a5" : "#e2e8f0"}`,
+                  border: "2px solid " + (actionData?.error ? "#fca5a5" : "#e2e8f0"),
                   borderRadius: "12px",
                   outline: "none",
                   transition: "all 0.2s ease",
@@ -640,7 +408,7 @@ function AdminLogin() {
                   e.target.style.boxShadow = "none";
                 }}
               />
-              <Mail
+              <Lock
                 size={22}
                 style={{
                   position: "absolute",
@@ -682,19 +450,17 @@ function AdminLogin() {
           <motion.div variants={itemVariants} style={{ marginTop: "1.5rem" }}>
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={!password.trim() || isSubmitting}
               style={{
                 width: "100%",
                 padding: "1rem 1.5rem",
                 fontSize: "1.125rem",
                 fontWeight: 500,
                 color: "#ffffff",
-                background: isSubmitting
-                  ? "linear-gradient(135deg, #475569 0%, #64748b 100%)"
-                  : "linear-gradient(135deg, #0f172b 0%, #1e293b 100%)",
+                backgroundColor: password.trim() && !isSubmitting ? "#0f172b" : "#94a3bc",
                 border: "none",
                 borderRadius: "12px",
-                cursor: isSubmitting ? "default" : "pointer",
+                cursor: password.trim() && !isSubmitting ? "pointer" : "default",
                 transition: "all 0.2s ease",
                 display: "flex",
                 alignItems: "center",
@@ -702,14 +468,15 @@ function AdminLogin() {
                 gap: "0.5rem",
               }}
               onMouseEnter={(e) => {
-                if (!isSubmitting) {
-                  e.currentTarget.style.transform = "translateY(-2px)";
-                  e.currentTarget.style.boxShadow =
-                    "0 8px 32px rgba(15, 23, 42, 0.35)";
+                if (password.trim() && !isSubmitting) {
+                  e.currentTarget.style.backgroundColor = "#1e293b";
+                  e.currentTarget.style.transform = "translateY(-1px)";
+                  e.currentTarget.style.boxShadow = "0 4px 20px rgba(15, 23, 42, 0.3)";
                 }
               }}
               onMouseLeave={(e) => {
-                if (!isSubmitting) {
+                if (password.trim() && !isSubmitting) {
+                  e.currentTarget.style.backgroundColor = "#0f172b";
                   e.currentTarget.style.transform = "translateY(0)";
                   e.currentTarget.style.boxShadow = "none";
                 }
@@ -718,12 +485,12 @@ function AdminLogin() {
               {isSubmitting ? (
                 <>
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "spin 0.8s linear infinite" }}><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
-                  Sending...
+                  Signing in...
                 </>
               ) : (
                 <>
-                  Send Verification Code
-                  <Key size={20} />
+                  Sign In to Admin
+                  <ArrowRight size={20} />
                 </>
               )}
             </button>

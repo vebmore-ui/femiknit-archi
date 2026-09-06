@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseClient, initializeBrowserClient } from "@/lib/supabase";
 
 export type User = {
   id: string;
@@ -95,9 +95,15 @@ async function syncPendingCustomers() {
   }
 }
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({ children, supabaseUrl, supabaseAnonKey }: { children: React.ReactNode; supabaseUrl?: string; supabaseAnonKey?: string }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (supabaseUrl && supabaseAnonKey) {
+      initializeBrowserClient(supabaseUrl, supabaseAnonKey);
+    }
+  }, [supabaseUrl, supabaseAnonKey]);
 
   useEffect(() => {
     let mounted = true;
@@ -106,7 +112,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const initAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session } } = await getSupabaseClient().auth.getSession();
         if (!mounted) return;
 
         const trySetUser = (sess: typeof session) => {
@@ -128,7 +134,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           while (retryCount < maxRetries) {
             await new Promise((resolve) => setTimeout(resolve, 200));
             retryCount++;
-            const { data } = await supabase.auth.refreshSession();
+            const { data } = await getSupabaseClient().auth.refreshSession();
             if (trySetUser(data.session)) break;
           }
         }
@@ -144,7 +150,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     initAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = getSupabaseClient().auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
       if (session?.user) {
         const name = session.user.user_metadata?.full_name || session.user.user_metadata?.name;
@@ -174,7 +180,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await getSupabaseClient().auth.signInWithPassword({ email, password });
     if (!error) {
       await syncCustomer({ email });
     }
@@ -182,7 +188,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signUp = useCallback(async (email: string, password: string, name: string) => {
-    const { error } = await supabase.auth.signUp({
+    const { error } = await getSupabaseClient().auth.signUp({
       email,
       password,
       options: { data: { full_name: name } },
@@ -194,14 +200,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signInWithGoogle = useCallback(async () => {
-    await supabase.auth.signInWithOAuth({
+    await getSupabaseClient().auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: `${window.location.origin}/api/auth/callback` },
     });
   }, []);
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
+    await getSupabaseClient().auth.signOut();
   }, []);
 
   return (

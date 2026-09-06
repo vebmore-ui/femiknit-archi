@@ -44,6 +44,66 @@ function getSupabase() {
   return cachedSupabase;
 }
 
+function isBase64Image(src: string): boolean {
+  return src.startsWith("data:image");
+}
+
+async function uploadBase64ToStorage(productId: string, index: number, base64: string): Promise<string> {
+  const match = base64.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) {
+    return base64;
+  }
+
+  const mimeType = match[1];
+  const data = match[2];
+  const extension = mimeType.split("/")[1] || "png";
+  const filePath = `products/${productId}/${index}.${extension}`;
+
+  try {
+    const binary = atob(data);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+
+    const supabase = getSupabase();
+    const { error } = await supabase.storage
+      .from("product-images")
+      .upload(filePath, bytes, {
+        contentType: mimeType,
+        upsert: true,
+      });
+
+    if (error) {
+      console.error("Failed to upload image to Supabase Storage:", error);
+      return base64;
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from("product-images")
+      .getPublicUrl(filePath);
+
+    return publicUrl;
+  } catch (err) {
+    console.error("Image upload exception:", err);
+    return base64;
+  }
+}
+
+async function ensureImageUrls(productId: string, images: string[]): Promise<string[]> {
+  const result: string[] = [];
+  for (let i = 0; i < images.length; i++) {
+    const img = images[i];
+    if (isBase64Image(img)) {
+      const url = await uploadBase64ToStorage(productId, i, img);
+      result.push(url);
+    } else {
+      result.push(img);
+    }
+  }
+  return result;
+}
+
 export async function getAllProducts(): Promise<Product[]> {
   const supabase = getSupabase();
   const { data: products, error } = await supabase
@@ -95,6 +155,8 @@ export async function createProduct(product: Omit<Product, "id">): Promise<Produ
   console.log("Gender:", product.gender);
   console.log("Price:", product.price);
 
+  const processedImages = await ensureImageUrls(newId, product.images);
+
   const { data, error } = await supabase
     .from("products")
     .insert({
@@ -107,7 +169,7 @@ export async function createProduct(product: Omit<Product, "id">): Promise<Produ
       age_group: product.ageGroup || "",
       category: product.category || "",
       status: product.status,
-      images: product.images,
+      images: processedImages,
       subcategory: product.subcategory,
       badge: product.badge,
     })
@@ -162,7 +224,10 @@ export async function updateProduct(id: string, updates: Partial<Omit<Product, "
   if (updates.ageGroup !== undefined) dbUpdates.age_group = updates.ageGroup;
   if (updates.category !== undefined) dbUpdates.category = updates.category;
   if (updates.status !== undefined) dbUpdates.status = updates.status;
-  if (updates.images !== undefined) dbUpdates.images = updates.images;
+  if (updates.images !== undefined) {
+    const processedImages = await ensureImageUrls(id, updates.images);
+    dbUpdates.images = processedImages;
+  }
   if (updates.subcategory !== undefined) dbUpdates.subcategory = updates.subcategory;
   if (updates.badge !== undefined) dbUpdates.badge = updates.badge;
 
@@ -214,6 +279,19 @@ export async function deleteProduct(id: string): Promise<boolean> {
     return false;
   }
 
+  try {
+    const { data: files } = await supabase.storage
+      .from("product-images")
+      .list(`${id}/`);
+
+    if (files && files.length > 0) {
+      const paths = files.map((f: { name: string }) => `${id}/${f.name}`);
+      await supabase.storage.from("product-images").remove(paths);
+    }
+  } catch (err) {
+    console.error("Error deleting product images:", err);
+  }
+
   return true;
 }
 
@@ -225,8 +303,8 @@ function mapSupabaseProduct(row: Record<string, unknown>): Product {
     price: (row.price as string) || "0",
     discountPrice: (row.discount_price as string) || "",
     gender: (row.gender as string) || "Unisex",
-    ageGroup: (row.age_group as string) || undefined,
-    category: (row.category as string) || undefined,
+    ageGroup: row.age_group as string | undefined,
+    category: row.category as string | undefined,
     status: (row.status as string) || "In Stock",
     images: (row.images as string[]) || [],
     subcategory: row.subcategory as string | undefined,

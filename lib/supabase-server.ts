@@ -2,11 +2,25 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { serialize } from "cookie";
 
-const supabaseUrl = process.env.SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
 const ONE_YEAR_MAX_AGE = 60 * 60 * 24 * 365;
+
+function getSupabaseUrl(): string {
+  const url = process.env.SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
+  if (!url) throw new Error("Missing SUPABASE_URL");
+  return url;
+}
+
+function getSupabaseAnonKey(): string {
+  const key = process.env.SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
+  if (!key) throw new Error("Missing SUPABASE_ANON_KEY");
+  return key;
+}
+
+function getSupabaseServiceKey(): string {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!key) throw new Error("Missing Supabase server credentials. Please add SUPABASE_SERVICE_ROLE_KEY to your .env file.");
+  return key;
+}
 
 function parseCookies(cookieHeader: string | null): Record<string, string> {
   if (!cookieHeader) return {};
@@ -25,9 +39,8 @@ function parseCookies(cookieHeader: string | null): Record<string, string> {
 }
 
 export function getSupabaseServerClient(): SupabaseClient {
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error("Missing Supabase server credentials. Please add SUPABASE_SERVICE_ROLE_KEY to your .env file.");
-  }
+  const supabaseUrl = getSupabaseUrl();
+  const supabaseServiceKey = getSupabaseServiceKey();
   return createClient(supabaseUrl, supabaseServiceKey, {
     auth: {
       autoRefreshToken: false,
@@ -37,12 +50,14 @@ export function getSupabaseServerClient(): SupabaseClient {
 }
 
 export function createServerSupabaseClient(request: Request) {
+  const supabaseUrl = getSupabaseUrl();
+  const supabaseAnonKey = getSupabaseAnonKey();
   const cookies = parseCookies(request.headers.get("cookie"));
   const responseCookies: { name: string; value: string; options: Record<string, unknown> }[] = [];
 
   return createServerClient(
-    supabaseUrl!,
-    supabaseAnonKey!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookieOptions: {
         maxAge: ONE_YEAR_MAX_AGE,
@@ -65,7 +80,11 @@ export function createServerSupabaseClient(request: Request) {
 }
 
 export async function requireOwner(request: Request): Promise<{ user: { id: string; email?: string | null }; headers: Headers }> {
-  if (!supabaseUrl || !supabaseAnonKey) {
+  const supabaseUrl = getSupabaseUrl();
+  const supabaseAnonKey = getSupabaseAnonKey();
+  const ownerEmail = process.env.OWNER_EMAIL;
+
+  if (!ownerEmail) {
     throw new Response("Not Found", { status: 404, statusText: "Not Found" });
   }
 
@@ -101,8 +120,7 @@ export async function requireOwner(request: Request): Promise<{ user: { id: stri
     throw new Response("Not Found", { status: 404, statusText: "Not Found" });
   }
 
-  const ownerEmail = process.env.OWNER_EMAIL;
-  if (!ownerEmail || user.email !== ownerEmail) {
+  if (user.email !== ownerEmail) {
     throw new Response("Not Found", { status: 404, statusText: "Not Found" });
   }
 

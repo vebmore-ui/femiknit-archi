@@ -1,15 +1,22 @@
 import "./globals.css";
-import {
-  Links,
-  Meta,
-  Outlet,
-  Scripts,
-  ScrollRestoration,
-} from "@remix-run/react";
+import { Links, Meta, Outlet, Scripts, ScrollRestoration, useLoaderData } from "@remix-run/react";
+import { json } from "@remix-run/node";
 import { StoreProvider } from "@/context/StoreContext";
 import { AuthProvider } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { AuthPromptModal } from "@/components/AuthPromptModal";
+
+export const loader = async () => {
+  return json({
+    SUPABASE_URL: process.env.SUPABASE_URL,
+    SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY,
+  });
+};
+
+type LoaderData = {
+  SUPABASE_URL: string | undefined;
+  SUPABASE_ANON_KEY: string | undefined;
+};
 
 export const links = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -45,6 +52,8 @@ export function meta() {
 }
 
 export default function App() {
+  const { SUPABASE_URL, SUPABASE_ANON_KEY } = useLoaderData<LoaderData>();
+
   return (
     <html lang="en-IN">
       <head>
@@ -55,7 +64,7 @@ export default function App() {
       </head>
       <body className="font-sans antialiased">
         <StoreProvider>
-          <AuthProvider>
+          <AuthProvider supabaseUrl={SUPABASE_URL} supabaseAnonKey={SUPABASE_ANON_KEY}>
             <ThemeProvider>
               <Outlet />
               <AuthPromptModal />

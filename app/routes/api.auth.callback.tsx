@@ -1,12 +1,32 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "@remix-run/react";
-import { supabase } from "@/lib/supabase";
+import { useNavigate, useSearchParams, useLoaderData } from "@remix-run/react";
+import { json } from "@remix-run/node";
+import { getSupabaseClient, initializeBrowserClient } from "@/lib/supabase";
+
+export const loader = async () => {
+  return json({
+    SUPABASE_URL: process.env.SUPABASE_URL,
+    SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY,
+  });
+};
+
+type LoaderData = {
+  SUPABASE_URL: string | undefined;
+  SUPABASE_ANON_KEY: string | undefined;
+};
 
 export default function AuthCallback() {
+  const { SUPABASE_URL, SUPABASE_ANON_KEY } = useLoaderData<LoaderData>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+      initializeBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    }
+  }, [SUPABASE_URL, SUPABASE_ANON_KEY]);
 
   useEffect(() => {
     const handleCallback = async () => {
@@ -21,7 +41,7 @@ export default function AuthCallback() {
           return;
         }
 
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        const { error } = await getSupabaseClient().auth.exchangeCodeForSession(code);
 
         if (error) {
           setStatus("error");
@@ -29,7 +49,7 @@ export default function AuthCallback() {
           return;
         }
 
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session } } = await getSupabaseClient().auth.getSession();
         if (session?.user) {
           const name = session.user.user_metadata?.full_name || session.user.user_metadata?.name || "";
           const attempts = [0, 800, 1600];
