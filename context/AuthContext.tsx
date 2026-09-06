@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { getSupabaseClient, initializeBrowserClient } from "@/lib/supabase";
+import type { AuthChangeEvent, Session } from "@supabase/auth-js";
 
 export type User = {
   id: string;
@@ -150,7 +151,7 @@ export function AuthProvider({ children, supabaseUrl, supabaseAnonKey }: { child
 
     initAuth();
 
-    const { data: { subscription } } = getSupabaseClient().auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = getSupabaseClient().auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
       if (!mounted) return;
       if (session?.user) {
         const name = session.user.user_metadata?.full_name || session.user.user_metadata?.name;

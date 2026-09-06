@@ -35,6 +35,13 @@ export default function AuthCallback() {
         const code = searchParams.get("code") || url.searchParams.get("code");
         const next = searchParams.get("next") || url.searchParams.get("next") || "/";
 
+        const { data: { session } } = await getSupabaseClient().auth.getSession();
+        if (session?.user) {
+          setStatus("success");
+          setTimeout(() => navigate(next, { replace: true }), 1200);
+          return;
+        }
+
         if (!code) {
           setStatus("error");
           setErrorMessage("No authentication code received. Please try signing in again.");
@@ -49,9 +56,9 @@ export default function AuthCallback() {
           return;
         }
 
-        const { data: { session } } = await getSupabaseClient().auth.getSession();
-        if (session?.user) {
-          const name = session.user.user_metadata?.full_name || session.user.user_metadata?.name || "";
+        const { data: { session: newSession } } = await getSupabaseClient().auth.getSession();
+        if (newSession?.user) {
+          const name = newSession.user.user_metadata?.full_name || newSession.user.user_metadata?.name || "";
           const attempts = [0, 800, 1600];
           for (const delay of attempts) {
             if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
@@ -59,7 +66,7 @@ export default function AuthCallback() {
               const res = await fetch("/api/customers", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email: session.user.email, name }),
+                body: JSON.stringify({ email: newSession.user.email, name }),
               });
               if (res.ok) break;
             } catch {
