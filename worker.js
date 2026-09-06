@@ -43,6 +43,6 @@ const handler = createRequestHandler(() => ({
 export default {
   fetch: (request, env, ctx) => {
     workerEnv = env;
-    return handler(request);
+    return handler(request, { cloudflare: { env } });
   },
 };

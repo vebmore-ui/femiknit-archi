@@ -28,16 +28,16 @@ import styles from "../admin/layout.module.css";
 const ADMIN_SESSION_COOKIE = "femiknit_admin_session";
 const SESSION_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000;
 
-function getOwnerEmail(): string {
-  return process.env.OWNER_EMAIL || "owner@example.com";
+function getOwnerEmail(env?: Record<string, string | undefined>): string {
+  return env?.OWNER_EMAIL || process.env.OWNER_EMAIL || "owner@example.com";
 }
 
-function getAdminPassword(): string | undefined {
-  return process.env.ADMIN_PASSWORD;
+function getAdminPassword(env?: Record<string, string | undefined>): string | undefined {
+  return env?.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD;
 }
 
-function getAdminSessionSecret(): string | undefined {
-  return process.env.ADMIN_SESSION_SECRET;
+function getAdminSessionSecret(env?: Record<string, string | undefined>): string | undefined {
+  return env?.ADMIN_SESSION_SECRET || process.env.ADMIN_SESSION_SECRET;
 }
 
 const chrome404HTML = `<!DOCTYPE html>
@@ -211,12 +211,13 @@ function notFoundResponse(): Response {
   });
 }
 
-export async function loader({ request }: LoaderFunctionArgs) {
+export async function loader({ request, context }: LoaderFunctionArgs) {
   const cookies = parseCookies(request.headers.get("cookie"));
   const sessionToken = cookies[ADMIN_SESSION_COOKIE];
   const sessionEmail = sessionToken ? await verifySession(sessionToken) : null;
+  const env = (context as any)?.cloudflare?.env as Record<string, string | undefined> | undefined;
 
-  const isAuthenticated = sessionEmail === getOwnerEmail();
+  const isAuthenticated = sessionEmail === getOwnerEmail(env);
 
   return json({
     isAuthenticated,
@@ -224,9 +225,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
   });
 }
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request, context }: ActionFunctionArgs) {
   const formData = await request.formData();
   const phase = formData.get("phase")?.toString() || "login";
+  const env = (context as any)?.cloudflare?.env as Record<string, string | undefined> | undefined;
 
   if (phase === "login") {
     const password = formData.get("password")?.toString() || "";
@@ -235,15 +237,15 @@ export async function action({ request }: ActionFunctionArgs) {
       return json({ error: "Please enter your password." });
     }
 
-    if (!getAdminPassword()) {
+    if (!getAdminPassword(env)) {
       return json({ error: "Admin authentication is not configured." }, { status: 500 });
     }
 
-    if (password !== getAdminPassword()) {
+    if (password !== getAdminPassword(env)) {
       return json({ error: "Invalid credentials." }, { status: 401 });
     }
 
-    const token = await signSession(getOwnerEmail());
+    const token = await signSession(getOwnerEmail(env));
 
     const headers = new Headers();
     headers.append("Set-Cookie", setSessionCookie(token));
