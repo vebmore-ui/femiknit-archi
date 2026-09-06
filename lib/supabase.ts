@@ -4,7 +4,9 @@ let cachedClient: ReturnType<typeof createClient> | null = null;
 
 export function initializeBrowserClient(supabaseUrl: string, supabaseAnonKey: string) {
   if (!cachedClient) {
-    cachedClient = createClient(supabaseUrl, supabaseAnonKey);
+    cachedClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { flowType: "pkce" },
+    });
   }
 }
 
@@ -17,7 +19,9 @@ export function getSupabaseClient() {
       throw new Error("Missing Supabase client credentials.");
     }
 
-    cachedClient = createClient(supabaseUrl, supabaseAnonKey);
+    cachedClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { flowType: "pkce" },
+    });
   }
   return cachedClient;
 }
