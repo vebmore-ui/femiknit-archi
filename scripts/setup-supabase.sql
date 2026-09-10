@@ -90,3 +90,31 @@ CREATE POLICY "Allow authenticated update product-images" ON storage.objects
 
 CREATE POLICY "Allow authenticated delete product-images" ON storage.objects
   FOR DELETE USING (bucket_id = 'product-images' AND auth.role() = 'authenticated');
+
+-- ADMIN USERS: role-based access control for admin dashboard
+CREATE TABLE IF NOT EXISTS public.admin_users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email TEXT UNIQUE NOT NULL,
+  role TEXT NOT NULL DEFAULT 'admin',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_users_email ON public.admin_users(email);
+
+ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY;
+
+-- Only allow service role / server-side operations to read admin_users
+-- Client-side anon key cannot read admin_users
+CREATE POLICY "Allow service role to read admin_users" ON public.admin_users
+  FOR SELECT USING (false);
+
+-- Prevent client-side inserts/updates/deletes
+CREATE POLICY "Prevent client insert admin_users" ON public.admin_users
+  FOR INSERT WITH CHECK (false);
+
+CREATE POLICY "Prevent client update admin_users" ON public.admin_users
+  FOR UPDATE USING (false);
+
+CREATE POLICY "Prevent client delete admin_users" ON public.admin_users
+  FOR DELETE USING (false);
+

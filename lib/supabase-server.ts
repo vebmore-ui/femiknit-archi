@@ -55,7 +55,7 @@ export function createServerSupabaseClient(request: Request) {
   const cookies = parseCookies(request.headers.get("cookie"));
   const responseCookies: { name: string; value: string; options: Record<string, unknown> }[] = [];
 
-  return createServerClient(
+  const supabase = createServerClient(
     supabaseUrl,
     supabaseAnonKey,
     {
@@ -77,6 +77,24 @@ export function createServerSupabaseClient(request: Request) {
       },
     }
   );
+
+  return {
+    client: supabase,
+    getHeaders: () => {
+      const headers = new Headers();
+      responseCookies.forEach(({ name, value, options }) => {
+        headers.append(
+          "Set-Cookie",
+          serialize(name, value, {
+            ...options,
+            maxAge: ONE_YEAR_MAX_AGE,
+            path: "/",
+          })
+        );
+      });
+      return headers;
+    },
+  };
 }
 
 export async function requireOwner(request: Request): Promise<{ user: { id: string; email?: string | null }; headers: Headers }> {
@@ -122,6 +140,79 @@ export async function requireOwner(request: Request): Promise<{ user: { id: stri
 
   if (user.email !== ownerEmail) {
     throw new Response("Not Found", { status: 404, statusText: "Not Found" });
+  }
+
+  const headers = new Headers();
+  responseCookies.forEach(({ name, value, options }) => {
+    const cookieStr = serialize(name, value, {
+      ...options,
+      maxAge: ONE_YEAR_MAX_AGE,
+      path: "/",
+    });
+    headers.append("Set-Cookie", cookieStr);
+  });
+
+  return { user, headers };
+}
+
+export async function requireAdmin(request: Request): Promise<{ user: { id: string; email?: string | null }; headers: Headers }> {
+  const supabaseUrl = getSupabaseUrl();
+  const supabaseAnonKey = getSupabaseAnonKey();
+  const serviceRoleKey = getSupabaseServiceKey();
+
+  const cookies = parseCookies(request.headers.get("cookie"));
+  const responseCookies: { name: string; value: string; options: Record<string, unknown> }[] = [];
+
+  const supabase = createServerClient(
+    supabaseUrl,
+    supabaseAnonKey,
+    {
+      cookieOptions: {
+        maxAge: ONE_YEAR_MAX_AGE,
+      },
+      cookies: {
+        getAll: () =>
+          Object.entries(cookies).map(([name, value]) => ({ name, value })),
+        setAll: (cookiesToSet) => {
+          responseCookies.push(
+            ...cookiesToSet.map(({ name, value, options }) => ({
+              name,
+              value,
+              options: options || {},
+            }))
+          );
+        },
+      },
+    }
+  );
+
+  const { data: { user }, error } = await supabase.auth.getUser();
+
+  if (!user || error) {
+    throw new Response("Unauthorized", { status: 401, statusText: "Unauthorized" });
+  }
+
+  if (!user.email) {
+    throw new Response("Forbidden", { status: 403, statusText: "Forbidden" });
+  }
+
+  const adminSupabase = createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+
+  const { data: adminUser, error: adminError } = await adminSupabase
+    .from("admin_users")
+    .select("email")
+    .ilike("email", user.email)
+    .maybeSingle();
+
+  console.log(`[requireAdmin diagnostics] authenticatedEmail=${user.email} adminFound=${!!adminUser} adminError=${adminError ? adminError.message : "none"}`);
+
+  if (adminError || !adminUser) {
+    throw new Response("Forbidden", { status: 403, statusText: "Forbidden" });
   }
 
   const headers = new Headers();

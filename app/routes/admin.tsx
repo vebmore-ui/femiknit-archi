@@ -1,90 +1,29 @@
 import React, { useState, useEffect } from "react";
 import {
   Outlet,
-  useLoaderData,
   useLocation,
   useNavigate,
-  useActionData,
   useSubmit,
-  useNavigation,
-  Form,
+  useLoaderData,
 } from "@remix-run/react";
 import {
   LayoutDashboard,
   Package,
   Users,
   Settings,
-  Lock,
-  ArrowRight,
   LogOut,
   X,
   RefreshCw,
+  Lock,
 } from "lucide-react";
 import { json, type LoaderFunctionArgs, type ActionFunctionArgs } from "@remix-run/node";
+import { createServerSupabaseClient, requireAdmin } from "@/lib/supabase-server";
 import { serialize } from "cookie";
 import { motion, AnimatePresence, type Variants } from "framer-motion";
 import styles from "../admin/layout.module.css";
 
 const ADMIN_SESSION_COOKIE = "femiknit_admin_session";
 const SESSION_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000;
-
-function getOwnerEmail(env?: Record<string, string | undefined>): string {
-  return env?.OWNER_EMAIL || process.env.OWNER_EMAIL || "owner@example.com";
-}
-
-function getAdminPassword(env?: Record<string, string | undefined>): string | undefined {
-  return env?.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD;
-}
-
-function getAdminSessionSecret(env?: Record<string, string | undefined>): string | undefined {
-  return env?.ADMIN_SESSION_SECRET || process.env.ADMIN_SESSION_SECRET;
-}
-
-const chrome404HTML = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>404 Not Found</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen,Ubuntu,"Courier New",monospace;background:#f5f5f5;color:#333;display:flex;align-items:center;justify-content:center;min-height:100vh}
-.error-container{max-width:560px;width:100%;background:#fff;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.15);overflow:hidden}
-.error-header{background:#f0f0f0;padding:14px 16px;font-weight:600;font-size:13px;color:#000;white-space:nowrap}
-.error-body{padding:24px;text-align:center}
-.error-icon{width:80px;height:80px;margin:0 auto 16px;border-radius:50%;background:#f1f1f1;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:600;color:#555}
-.error-title{font-size:16px;font-weight:500;margin-bottom:12px;color:#000}
-.error-message{font-size:13px;color:#666;margin-bottom:16px;line-height:1.5}
-</style>
-</head>
-<body>
-<div class="error-container">
-  <div class="error-header">Not Found</div>
-  <div class="error-body">
-    <div class="error-icon">!</div>
-    <h1 class="error-title">This page isn't available</h1>
-    <p class="error-message">The page you&#39;re looking for might have been removed or you don&#39;t have permission to access it.</p>
-    <p class="error-message">Error: 404 (Not Found)</p>
-  </div>
-</div>
-</body>
-</html>`;
-
-const navItems = [
-  { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
-  { name: "Products", href: "/admin/products", icon: Package },
-  { name: "Customers", href: "/admin/customers", icon: Users },
-  { name: "Settings", href: "/admin/settings", icon: Settings },
-];
-
-type LoaderData = {
-  isAuthenticated: boolean;
-  userEmail: string | undefined;
-};
-
-type ActionData = {
-  error?: string;
-};
 
 function parseCookies(
   cookieHeader: string | null
@@ -121,87 +60,35 @@ function clearSessionCookie(): string {
   });
 }
 
-function base64urlEncode(data: Uint8Array): string {
-  const base64 = btoa(String.fromCharCode(...data));
-  return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
-
-function base64urlDecode(str: string): Uint8Array {
-  let base64 = str.replace(/-/g, "+").replace(/_/g, "/");
-  while (base64.length % 4) base64 += "=";
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes;
-}
-
-async function getSigningKey(): Promise<CryptoKey | null> {
-  if (!getAdminSessionSecret()) return null;
-  const encoder = new TextEncoder();
-  const keyMaterial = await crypto.subtle.importKey(
-    "raw",
-    encoder.encode(getAdminSessionSecret()),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign", "verify"]
-  );
-  return keyMaterial;
-}
-
-async function signSession(email: string): Promise<string> {
-  const key = await getSigningKey();
-  if (!key) throw new Error("ADMIN_SESSION_SECRET is not configured");
-
-  const payload = {
-    email,
-    exp: Date.now() + SESSION_EXPIRY_MS,
-  };
-
-  const encoder = new TextEncoder();
-  const payloadBytes = encoder.encode(JSON.stringify(payload));
-  const payloadB64 = base64urlEncode(payloadBytes);
-
-  const signature = await crypto.subtle.sign(
-    "HMAC",
-    key,
-    encoder.encode(payloadB64)
-  );
-
-  return payloadB64 + "." + base64urlEncode(new Uint8Array(signature));
-}
-
-async function verifySession(token: string): Promise<string | null> {
-  const key = await getSigningKey();
-  if (!key) return null;
-
-  try {
-    const [payloadB64, signatureB64] = token.split(".");
-    if (!payloadB64 || !signatureB64) return null;
-
-    const encoder = new TextEncoder();
-    const signatureBytes = base64urlDecode(signatureB64);
-
-    const valid = await crypto.subtle.verify(
-      "HMAC",
-      key,
-      signatureBytes.buffer.slice(signatureBytes.byteOffset, signatureBytes.byteOffset + signatureBytes.byteLength) as ArrayBuffer,
-      encoder.encode(payloadB64)
-    );
-
-    if (!valid) return null;
-
-    const payloadBytes = base64urlDecode(payloadB64);
-    const payload = JSON.parse(new TextDecoder().decode(payloadBytes)) as { email: string; exp: number };
-
-    if (Date.now() > payload.exp) return null;
-
-    return payload.email;
-  } catch {
-    return null;
-  }
-}
+const chrome404HTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>404 Not Found</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen,Ubuntu,"Courier New",monospace;background:#f5f5f5;color:#333;display:flex;align-items:center;justify-content:center;min-height:100vh}
+.error-container{max-width:560px;width:100%;background:#fff;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.15);overflow:hidden}
+.error-header{background:#f0f0f0;padding:14px 16px;font-weight:600;font-size:13px;color:#000;white-space:nowrap}
+.error-body{padding:24px;text-align:center}
+.error-icon{width:80px;height:80px;margin:0 auto 16px;border-radius:50%;background:#f1f1f1;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:600;color:#555}
+.error-title{font-size:16px;font-weight:500;margin-bottom:12px;color:#000}
+.error-message{font-size:13px;color:#666;margin-bottom:12px;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="error-container">
+  <div class="error-header">Not Found</div>
+  <div class="error-body">
+    <div class="error-icon">!</div>
+    <h1 class="error-title">This page isn't available</h1>
+    <p class="error-message">The page you&#39;re looking for might have been removed or you don&#39;t have permission to access it.</p>
+    <p class="error-message">Error: 404 (Not Found)</p>
+  </div>
+</div>
+</body>
+</html>`;
 
 function notFoundResponse(): Response {
   return new Response(chrome404HTML, {
@@ -211,49 +98,52 @@ function notFoundResponse(): Response {
   });
 }
 
-export async function loader({ request, context }: LoaderFunctionArgs) {
-  const cookies = parseCookies(request.headers.get("cookie"));
-  const sessionToken = cookies[ADMIN_SESSION_COOKIE];
-  const sessionEmail = sessionToken ? await verifySession(sessionToken) : null;
-  const env = (context as any)?.cloudflare?.env as Record<string, string | undefined> | undefined;
+type LoaderData = {
+  isAuthenticated: boolean;
+  isAdmin: boolean;
+  userEmail: string | undefined;
+};
 
-  const isAuthenticated = sessionEmail === getOwnerEmail(env);
+export async function loader({ request }: LoaderFunctionArgs) {
+  try {
+    const { client: supabase } = createServerSupabaseClient(request);
+    const { data: { user }, error } = await supabase.auth.getUser();
 
-  return json({
-    isAuthenticated,
-    userEmail: sessionEmail ?? undefined,
-  });
+    if (!user || error) {
+      return json({ isAuthenticated: false, isAdmin: false, userEmail: undefined } satisfies LoaderData);
+    }
+
+    try {
+      const adminResult = await requireAdmin(request);
+      return json({
+        isAuthenticated: true,
+        isAdmin: true,
+        userEmail: adminResult.user.email ?? undefined,
+      } satisfies LoaderData);
+    } catch {
+      return json({
+        isAuthenticated: true,
+        isAdmin: false,
+        userEmail: user.email ?? undefined,
+      } satisfies LoaderData);
+    }
+  } catch {
+    return json({ isAuthenticated: false, isAdmin: false, userEmail: undefined } satisfies LoaderData);
+  }
 }
 
-export async function action({ request, context }: ActionFunctionArgs) {
+export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData();
   const phase = formData.get("phase")?.toString() || "login";
-  const env = (context as any)?.cloudflare?.env as Record<string, string | undefined> | undefined;
-
-  if (phase === "login") {
-    const password = formData.get("password")?.toString() || "";
-
-    if (!password) {
-      return json({ error: "Please enter your password." });
-    }
-
-    if (!getAdminPassword(env)) {
-      return json({ error: "Admin authentication is not configured." }, { status: 500 });
-    }
-
-    if (password !== getAdminPassword(env)) {
-      return json({ error: "Invalid credentials." }, { status: 401 });
-    }
-
-    const token = await signSession(getOwnerEmail(env));
-
-    const headers = new Headers();
-    headers.append("Set-Cookie", setSessionCookie(token));
-    headers.set("Location", "/admin");
-    return new Response(null, { status: 302, headers });
-  }
 
   if (phase === "logout") {
+    try {
+      const { client: supabase } = createServerSupabaseClient(request);
+      await supabase.auth.signOut();
+    } catch {
+      // ignore sign out errors
+    }
+
     const headers = new Headers();
     headers.append("Set-Cookie", clearSessionCookie());
     headers.set("Location", "/admin");
@@ -287,20 +177,12 @@ const itemVariants: Variants = {
 };
 
 function AdminLogin() {
-  const actionData = useActionData<ActionData>();
-  const submit = useSubmit();
-  const navigation = useNavigation();
-  const [password, setPassword] = useState("");
+  const navigate = useNavigate();
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
-  const isSubmitting = navigation.state === "submitting";
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!password.trim()) return;
-    const form = e.currentTarget as HTMLFormElement;
-    const formData = new FormData(form);
-    formData.set("password", password.trim());
-    submit(formData, { method: "post" });
+  const handleGoogleSignIn = () => {
+    setIsRedirecting(true);
+    navigate("/api/auth/google?next=/admin");
   };
 
   return (
@@ -321,10 +203,7 @@ function AdminLogin() {
           boxShadow: "0 20px 60px rgba(0, 0, 0, 0.12)",
         }}
       >
-        <motion.div
-          variants={itemVariants}
-          style={{ textAlign: "center", marginBottom: "2rem" }}
-        >
+        <motion.div variants={itemVariants} style={{ textAlign: "center", marginBottom: "2rem" }}>
           <motion.div
             initial={{ scale: 0.7, opacity: 0, rotate: -10 }}
             animate={{ scale: 1, opacity: 1, rotate: 0 }}
@@ -344,166 +223,72 @@ function AdminLogin() {
           >
             <Lock size={32} />
           </motion.div>
-          <h1
-            style={{
-              fontSize: "1.75rem",
-              fontWeight: 700,
-              color: "#0f172a",
-              margin: 0,
-            }}
-          >
+          <h1 style={{ fontSize: "1.75rem", fontWeight: 700, color: "#0f172a", margin: 0 }}>
             Admin Access
           </h1>
-          <p
-            style={{
-              fontSize: "0.95rem",
-              color: "#64748b",
-              marginTop: "0.5rem",
-            }}
-          >
-            Enter the admin password to continue
+          <p style={{ fontSize: "0.95rem", color: "#64748b", marginTop: "0.5rem" }}>
+            Sign in with your Google account to access the admin panel
           </p>
         </motion.div>
 
-        <form method="post" onSubmit={handleSubmit}>
-          <input type="hidden" name="phase" value="login" />
-
-          <motion.div variants={itemVariants}>
-            <label
-              htmlFor="password"
-              style={{
-                display: "block",
-                fontSize: "0.875rem",
-                fontWeight: 500,
-                color: "#334155",
-                marginBottom: "0.75rem",
-              }}
-            >
-              Password
-            </label>
-            <div style={{ position: "relative" }}>
-              <input
-                id="password"
-                type="password"
-                name="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter admin password"
-                required
-                autoComplete="current-password"
-                style={{
-                  width: "100%",
-                  padding: "1.25rem 1.5rem 1.25rem 3.5rem",
-                  fontSize: "1.25rem",
-                  border: "2px solid " + (actionData?.error ? "#fca5a5" : "#e2e8f0"),
-                  borderRadius: "12px",
-                  outline: "none",
-                  transition: "all 0.2s ease",
-                  boxSizing: "border-box",
-                }}
-                onFocus={(e) => {
-                  e.target.style.borderColor = "#38bdf8";
-                  e.target.style.boxShadow = "0 0 0 3px rgba(56, 189, 248, 0.2)";
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = actionData?.error ? "#fca5a5" : "#e2e8f0";
-                  e.target.style.boxShadow = "none";
-                }}
-              />
-              <Lock
-                size={22}
-                style={{
-                  position: "absolute",
-                  left: "1rem",
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  color: "#94a3bc",
-                }}
-              />
-            </div>
-          </motion.div>
-
-          <AnimatePresence>
-            {actionData?.error && (
-              <motion.div
-                initial={{ opacity: 0, y: -8, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -8, scale: 0.95 }}
-                transition={{ type: "spring", stiffness: 400, damping: 20 }}
-                style={{
-                  background: "#fef2f2",
-                  border: "1px solid #fecaca",
-                  color: "#dc2626",
-                  fontSize: "0.875rem",
-                  padding: "0.875rem 1rem",
-                  borderRadius: "10px",
-                  marginTop: "1rem",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                }}
-              >
-                <X size={16} />
-                {actionData.error}
-              </motion.div>
+        <motion.div variants={itemVariants} style={{ marginBottom: "1.5rem" }}>
+          <button
+            type="button"
+            onClick={handleGoogleSignIn}
+            disabled={isRedirecting}
+            style={{
+              width: "100%",
+              padding: "1rem 1.5rem",
+              fontSize: "1.125rem",
+              fontWeight: 500,
+              color: "#ffffff",
+              backgroundColor: isRedirecting ? "#94a3bc" : "#0f172b",
+              border: "none",
+              borderRadius: "12px",
+              cursor: isRedirecting ? "default" : "pointer",
+              transition: "all 0.2s ease",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "0.5rem",
+            }}
+            onMouseEnter={(e) => {
+              if (!isRedirecting) {
+                e.currentTarget.style.backgroundColor = "#1e293b";
+                e.currentTarget.style.transform = "translateY(-1px)";
+                e.currentTarget.style.boxShadow = "0 4px 20px rgba(15, 23, 42, 0.3)";
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isRedirecting) {
+                e.currentTarget.style.backgroundColor = "#0f172b";
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "none";
+              }
+            }}
+          >
+            {isRedirecting ? (
+              <>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "spin 0.8s linear infinite" }}><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
+                Redirecting...
+              </>
+            ) : (
+              <>
+                <svg width="20" height="20" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path fill="#FFC107" d="M43.953 25.123c0-1.59-.134-3.127-.384-4.618l.032-3.07h-5.756c-.718 4.1-2.858 7.56-5.846 9.884l0 0-.228.001 3.392 5.102 0 0 2.526 3.904c3.47-2.826 5.826-7.094 6.804-12.29z" />
+                  <path fill="#FF3D00" d="M24.978 29.514c-2.62 0-4.944-.992-6.623-2.646l-.012.01-3.392 5.102 0 0 2.526 3.904c3.47-2.826 5.826-7.094 6.804-12.29z" />
+                  <path fill="#000" d="M24.978 15.373c1.426 0 2.77.26 3.93.75l.012.01-3.942 0 0 0-3.392-5.102 0 0 2.526 3.904 0 0 2.526 3.904 0 0 0 0z" />
+                  <path fill="#4285F4" d="M24.978 34.887c1.992 0 3.85-.44 5.484-1.204l-.04-0.026c-.62-.44-1.39-.81-2.29-.97 0 0-.006 0-.006 0 0 0 0 0 0 0-.9 0-1.67.36-2.29.97l-3.82 6.004 0 0 2.526 3.904c0 .006 0 .012.007.017-.001.001-.001.001-.001.001 0 0 0 0 0 0 1.992 0 3.85-.44 5.484-1.204l-.04-0.026c-.62-.44-1.39-.81-2.29-.97 0 0-.012 0-.012 0 0 0 0 0 0 0v0.001c-.9 0-1.67.36-2.29.97 0 0-.006 0-.006 0 0 0 0 0 0 0-.9 0-1.67.36-2.29.97l-3.82 6.004 0 0 2.526 3.904c0 .006 0 .012.007.017 0 0 0 0 0 0v0h0c-1.992 0-3.85-.44-5.484-1.204l-.012 0 0 0z" />
+                  <path fill="#4285F4" d="M43.953 25.123c0-1.59-.134-3.127-.384-4.618l.032-3.07h-5.756c-.718 4.1-2.858 7.56-5.846 9.884l0 0-.228.001 3.392 5.102 0 0 2.526 3.904c3.47-2.826 5.826-7.094 6.804-12.29z" />
+                </svg>
+                Sign in with Google
+              </>
             )}
-          </AnimatePresence>
+          </button>
+        </motion.div>
 
-          <motion.div variants={itemVariants} style={{ marginTop: "1.5rem" }}>
-            <button
-              type="submit"
-              disabled={!password.trim() || isSubmitting}
-              style={{
-                width: "100%",
-                padding: "1rem 1.5rem",
-                fontSize: "1.125rem",
-                fontWeight: 500,
-                color: "#ffffff",
-                backgroundColor: password.trim() && !isSubmitting ? "#0f172b" : "#94a3bc",
-                border: "none",
-                borderRadius: "12px",
-                cursor: password.trim() && !isSubmitting ? "pointer" : "default",
-                transition: "all 0.2s ease",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "0.5rem",
-              }}
-              onMouseEnter={(e) => {
-                if (password.trim() && !isSubmitting) {
-                  e.currentTarget.style.backgroundColor = "#1e293b";
-                  e.currentTarget.style.transform = "translateY(-1px)";
-                  e.currentTarget.style.boxShadow = "0 4px 20px rgba(15, 23, 42, 0.3)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (password.trim() && !isSubmitting) {
-                  e.currentTarget.style.backgroundColor = "#0f172b";
-                  e.currentTarget.style.transform = "translateY(0)";
-                  e.currentTarget.style.boxShadow = "none";
-                }
-              }}
-            >
-              {isSubmitting ? (
-                <>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "spin 0.8s linear infinite" }}><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
-                  Signing in...
-                </>
-              ) : (
-                <>
-                  Sign In to Admin
-                  <ArrowRight size={20} />
-                </>
-              )}
-            </button>
-          </motion.div>
-        </form>
-
-        <motion.div
-          variants={itemVariants}
-          style={{ marginTop: "1.5rem", textAlign: "center" }}
-        >
-          <motion.button
+        <motion.div variants={itemVariants} style={{ marginTop: "1.5rem", textAlign: "center" }}>
+          <button
             type="button"
             onClick={() => {
               window.location.href = "/";
@@ -532,10 +317,130 @@ function AdminLogin() {
           >
             <X size={14} />
             Back to site
-          </motion.button>
+          </button>
         </motion.div>
       </motion.div>
     </AnimatePresence>
+  );
+}
+
+function AdminAccessDenied({ userEmail }: { userEmail?: string }) {
+  const submit = useSubmit();
+
+  const handleLogout = () => {
+    const form = document.createElement("form");
+    form.method = "post";
+    const phaseInput = document.createElement("input");
+    phaseInput.type = "hidden";
+    phaseInput.name = "phase";
+    phaseInput.value = "logout";
+    form.appendChild(phaseInput);
+    document.body.appendChild(form);
+    submit(form);
+  };
+
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)",
+        padding: "1rem",
+      }}
+    >
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        style={{
+          width: "100%",
+          maxWidth: "420px",
+          padding: "2.5rem",
+          backgroundColor: "#ffffff",
+          borderRadius: "16px",
+          boxShadow: "0 20px 60px rgba(0, 0, 0, 0.12)",
+          textAlign: "center",
+        }}
+      >
+        <motion.div
+          initial={{ scale: 0.7, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ delay: 0.1, duration: 0.6, type: "spring", stiffness: 200, damping: 12 }}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "72px",
+            height: "72px",
+            borderRadius: "50%",
+            background: "linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)",
+            color: "#ffffff",
+            marginBottom: "1rem",
+            boxShadow: "0 8px 32px rgba(220, 38, 38, 0.25)",
+          }}
+        >
+          <X size={32} />
+        </motion.div>
+        <h1 style={{ fontSize: "1.75rem", fontWeight: 700, color: "#0f172a", margin: 0 }}>
+          Access Denied
+        </h1>
+        <p style={{ fontSize: "0.95rem", color: "#64748b", marginTop: "0.5rem" }}>
+          You are signed in as <strong>{userEmail}</strong>, but this account does not have administrator access.
+        </p>
+        <motion.button
+          onClick={handleLogout}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          style={{
+            marginTop: "1.5rem",
+            width: "100%",
+            padding: "0.875rem 1.5rem",
+            fontSize: "1rem",
+            fontWeight: 500,
+            color: "#ffffff",
+            backgroundColor: "#dc2626",
+            border: "none",
+            borderRadius: "12px",
+            cursor: "pointer",
+            transition: "all 0.2s ease",
+          }}
+        >
+          Sign Out
+        </motion.button>
+        <button
+          onClick={() => {
+            window.location.href = "/";
+          }}
+          style={{
+            marginTop: "0.75rem",
+            background: "none",
+            border: "none",
+            color: "#94a3bc",
+            fontSize: "0.875rem",
+            cursor: "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.25rem",
+            padding: "0.5rem 1rem",
+            borderRadius: "8px",
+            transition: "all 0.2s ease",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = "#0f172a";
+            e.currentTarget.style.backgroundColor = "#f1f5f9";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = "#94a3bc";
+            e.currentTarget.style.backgroundColor = "transparent";
+          }}
+        >
+          <X size={14} />
+          Back to site
+        </button>
+      </motion.div>
+    </div>
   );
 }
 
@@ -692,7 +597,7 @@ function LogoutButton() {
 }
 
 export default function AdminLayout() {
-  const { isAuthenticated } = useLoaderData<LoaderData>();
+  const { isAuthenticated, isAdmin, userEmail } = useLoaderData<LoaderData>();
   const location = useLocation();
 
   if (!isAuthenticated) {
@@ -712,6 +617,10 @@ export default function AdminLayout() {
     );
   }
 
+  if (!isAdmin) {
+    return <AdminAccessDenied userEmail={userEmail} />;
+  }
+
   return (
     <div className={styles.adminLayout}>
       <aside className={styles.sidebar}>
@@ -725,11 +634,16 @@ export default function AdminLayout() {
         </div>
 
         <nav className={styles.navLinks}>
-          {navItems.map((item) => {
+          {[
+            { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
+            { name: "Products", href: "/admin/products", icon: Package },
+            { name: "Customers", href: "/admin/customers", icon: Users },
+            { name: "Settings", href: "/admin/settings", icon: Settings },
+          ].map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.href;
             return (
-               <motion.button
+              <motion.button
                 key={item.href}
                 onClick={() => {
                   window.location.href = item.href;
