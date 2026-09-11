@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import {
   Outlet,
   useLocation,
-  useNavigate,
   useSubmit,
   useLoaderData,
 } from "@remix-run/react";
@@ -15,8 +14,10 @@ import {
   X,
   RefreshCw,
   Lock,
+  ArrowRight,
 } from "lucide-react";
-import { json, type LoaderFunctionArgs, type ActionFunctionArgs } from "@remix-run/node";
+import { json, redirect, type LoaderFunctionArgs, type ActionFunctionArgs } from "@remix-run/node";
+import { getSupabaseClient, initializeBrowserClient } from "@/lib/supabase";
 import { createServerSupabaseClient, requireAdmin } from "@/lib/supabase-server";
 import { serialize } from "cookie";
 import { motion, AnimatePresence, type Variants } from "framer-motion";
@@ -105,8 +106,8 @@ type LoaderData = {
 };
 
 export async function loader({ request, context }: LoaderFunctionArgs) {
-  const env = (context as any)?.cloudflare?.env as Record<string, string | undefined> | undefined;
   try {
+    const env = (context as any)?.cloudflare?.env as Record<string, string | undefined> | undefined;
     const { client: supabase } = createServerSupabaseClient(request, env);
     const { data: { user }, error } = await supabase.auth.getUser();
 
@@ -134,9 +135,9 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
 }
 
 export async function action({ request, context }: ActionFunctionArgs) {
-  const env = (context as any)?.cloudflare?.env as Record<string, string | undefined> | undefined;
   const formData = await request.formData();
   const phase = formData.get("phase")?.toString() || "login";
+  const env = (context as any)?.cloudflare?.env as Record<string, string | undefined> | undefined;
 
   if (phase === "logout") {
     try {
@@ -148,7 +149,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
 
     const headers = new Headers();
     headers.append("Set-Cookie", clearSessionCookie());
-    headers.set("Location", "/admin");
+    headers.set("Location", "/RJl2QWe2qR!AEQ5CbWRv");
     return new Response(null, { status: 302, headers });
   }
 
@@ -179,12 +180,47 @@ const itemVariants: Variants = {
 };
 
 function AdminLogin() {
-  const navigate = useNavigate();
-  const [isRedirecting, setIsRedirecting] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleGoogleSignIn = () => {
-    setIsRedirecting(true);
-    navigate("/api/auth/google?next=/admin");
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      const client = getSupabaseClient();
+      if (isSignUp) {
+        const { error: signUpError } = await client.auth.signUp({
+          email,
+          password,
+          options: { data: { full_name: name } },
+        });
+        if (signUpError) {
+          setError(signUpError.message || "Sign up failed. Please try again.");
+        } else {
+          window.location.href = "/RJl2QWe2qR!AEQ5CbWRv";
+        }
+      } else {
+        const { error: signInError } = await client.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (signInError) {
+          setError(signInError.message || "Invalid email or password.");
+        } else {
+          window.location.href = "/RJl2QWe2qR!AEQ5CbWRv";
+        }
+      }
+    } catch {
+      setError("Unexpected error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -226,66 +262,213 @@ function AdminLogin() {
             <Lock size={32} />
           </motion.div>
           <h1 style={{ fontSize: "1.75rem", fontWeight: 700, color: "#0f172a", margin: 0 }}>
-            Admin Access
+            {isSignUp ? "Create Admin Account" : "Admin Sign In"}
           </h1>
           <p style={{ fontSize: "0.95rem", color: "#64748b", marginTop: "0.5rem" }}>
-            Sign in with your Google account to access the admin panel
+            {isSignUp ? "Create a Supabase account for admin access" : "Sign in with your admin account"}
           </p>
         </motion.div>
 
-        <motion.div variants={itemVariants} style={{ marginBottom: "1.5rem" }}>
-          <button
-            type="button"
-            onClick={handleGoogleSignIn}
-            disabled={isRedirecting}
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
             style={{
-              width: "100%",
-              padding: "1rem 1.5rem",
-              fontSize: "1.125rem",
-              fontWeight: 500,
-              color: "#ffffff",
-              backgroundColor: isRedirecting ? "#94a3bc" : "#0f172b",
-              border: "none",
+              marginBottom: "1rem",
+              padding: "0.75rem 1rem",
               borderRadius: "12px",
-              cursor: isRedirecting ? "default" : "pointer",
-              transition: "all 0.2s ease",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "0.5rem",
-            }}
-            onMouseEnter={(e) => {
-              if (!isRedirecting) {
-                e.currentTarget.style.backgroundColor = "#1e293b";
-                e.currentTarget.style.transform = "translateY(-1px)";
-                e.currentTarget.style.boxShadow = "0 4px 20px rgba(15, 23, 42, 0.3)";
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!isRedirecting) {
-                e.currentTarget.style.backgroundColor = "#0f172b";
-                e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "none";
-              }
+              backgroundColor: "#fef2f2",
+              border: "1px solid #fecaca",
+              color: "#b91c1c",
+              fontSize: "0.875rem",
             }}
           >
-            {isRedirecting ? (
-              <>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "spin 0.8s linear infinite" }}><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
-                Redirecting...
-              </>
-            ) : (
-              <>
-                <svg width="20" height="20" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path fill="#FFC107" d="M43.953 25.123c0-1.59-.134-3.127-.384-4.618l.032-3.07h-5.756c-.718 4.1-2.858 7.56-5.846 9.884l0 0-.228.001 3.392 5.102 0 0 2.526 3.904c3.47-2.826 5.826-7.094 6.804-12.29z" />
-                  <path fill="#FF3D00" d="M24.978 29.514c-2.62 0-4.944-.992-6.623-2.646l-.012.01-3.392 5.102 0 0 2.526 3.904c3.47-2.826 5.826-7.094 6.804-12.29z" />
-                  <path fill="#000" d="M24.978 15.373c1.426 0 2.77.26 3.93.75l.012.01-3.942 0 0 0-3.392-5.102 0 0 2.526 3.904 0 0 2.526 3.904 0 0 0 0z" />
-                  <path fill="#4285F4" d="M24.978 34.887c1.992 0 3.85-.44 5.484-1.204l-.04-0.026c-.62-.44-1.39-.81-2.29-.97 0 0-.006 0-.006 0 0 0 0 0 0 0-.9 0-1.67.36-2.29.97l-3.82 6.004 0 0 2.526 3.904c0 .006 0 .012.007.017-.001.001-.001.001-.001.001 0 0 0 0 0 0 1.992 0 3.85-.44 5.484-1.204l-.04-0.026c-.62-.44-1.39-.81-2.29-.97 0 0-.012 0-.012 0 0 0 0 0 0 0v0.001c-.9 0-1.67.36-2.29.97 0 0-.006 0-.006 0 0 0 0 0 0 0-.9 0-1.67.36-2.29.97l-3.82 6.004 0 0 2.526 3.904c0 .006 0 .012.007.017 0 0 0 0 0 0v0h0c-1.992 0-3.85-.44-5.484-1.204l-.012 0 0 0z" />
-                  <path fill="#4285F4" d="M43.953 25.123c0-1.59-.134-3.127-.384-4.618l.032-3.07h-5.756c-.718 4.1-2.858 7.56-5.846 9.884l0 0-.228.001 3.392 5.102 0 0 2.526 3.904c3.47-2.826 5.826-7.094 6.804-12.29z" />
-                </svg>
-                Sign in with Google
-              </>
+            {error}
+          </motion.div>
+        )}
+
+        <form onSubmit={handleSubmit}>
+          <input type="hidden" name="phase" value={isSignUp ? "signup" : "signin"} />
+
+          <motion.div variants={itemVariants} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            {isSignUp && (
+              <div>
+                <label htmlFor="name" style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "#334155", marginBottom: "0.5rem" }}>
+                  Full Name
+                </label>
+                <input
+                  id="name"
+                  type="text"
+                  name="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  autoComplete="name"
+                  style={{
+                    width: "100%",
+                    padding: "0.875rem 1rem",
+                    fontSize: "1rem",
+                    border: "2px solid #e2e8f0",
+                    borderRadius: "12px",
+                    outline: "none",
+                    transition: "all 0.2s ease",
+                    boxSizing: "border-box",
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = "#38bdf8";
+                    e.target.style.boxShadow = "0 0 0 3px rgba(56, 189, 248, 0.2)";
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = "#e2e8f0";
+                    e.target.style.boxShadow = "none";
+                  }}
+                />
+              </div>
             )}
+
+            <div>
+              <label htmlFor="email" style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "#334155", marginBottom: "0.5rem" }}>
+                Email
+              </label>
+              <input
+                id="email"
+                type="email"
+                name="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+                style={{
+                  width: "100%",
+                  padding: "0.875rem 1rem",
+                  fontSize: "1rem",
+                  border: "2px solid #e2e8f0",
+                  borderRadius: "12px",
+                  outline: "none",
+                  transition: "all 0.2s ease",
+                  boxSizing: "border-box",
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = "#38bdf8";
+                  e.target.style.boxShadow = "0 0 0 3px rgba(56, 189, 248, 0.2)";
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = "#e2e8f0";
+                  e.target.style.boxShadow = "none";
+                }}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="password" style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "#334155", marginBottom: "0.5rem" }}>
+                Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                name="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+                autoComplete={isSignUp ? "new-password" : "current-password"}
+                style={{
+                  width: "100%",
+                  padding: "0.875rem 1rem",
+                  fontSize: "1rem",
+                  border: "2px solid #e2e8f0",
+                  borderRadius: "12px",
+                  outline: "none",
+                  transition: "all 0.2s ease",
+                  boxSizing: "border-box",
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = "#38bdf8";
+                  e.target.style.boxShadow = "0 0 0 3px rgba(56, 189, 248, 0.2)";
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = "#e2e8f0";
+                  e.target.style.boxShadow = "none";
+                }}
+              />
+            </div>
+          </motion.div>
+
+          <motion.div variants={itemVariants} style={{ marginTop: "1.5rem" }}>
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                width: "100%",
+                padding: "1rem 1.5rem",
+                fontSize: "1.125rem",
+                fontWeight: 500,
+                color: "#ffffff",
+                backgroundColor: loading ? "#94a3bc" : "#0f172b",
+                border: "none",
+                borderRadius: "12px",
+                cursor: loading ? "not-allowed" : "pointer",
+                transition: "all 0.2s ease",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "0.5rem",
+              }}
+              onMouseEnter={(e) => {
+                if (!loading) {
+                  e.currentTarget.style.backgroundColor = "#1e293b";
+                  e.currentTarget.style.transform = "translateY(-1px)";
+                  e.currentTarget.style.boxShadow = "0 4px 20px rgba(15, 23, 42, 0.3)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = loading ? "#94a3bc" : "#0f172b";
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "none";
+              }}
+            >
+              {loading ? (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "spin 0.8s linear infinite" }}>
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="16" x2="12" y2="12" />
+                  <line x1="12" y1="8" x2="12.01" y2="8" />
+                </svg>
+              ) : (
+                <>
+                  {isSignUp ? "Create Account" : "Sign In"}
+                  <ArrowRight size={20} />
+                </>
+              )}
+            </button>
+          </motion.div>
+        </form>
+
+        <motion.div variants={itemVariants} style={{ marginTop: "1.5rem", textAlign: "center" }}>
+          <button
+            type="button"
+            onClick={() => {
+              setIsSignUp(!isSignUp);
+              setError("");
+            }}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#0f172b",
+              fontSize: "0.875rem",
+              fontWeight: 500,
+              cursor: "pointer",
+              padding: "0.5rem 1rem",
+              borderRadius: "8px",
+              transition: "all 0.2s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "#f1f5f9";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "transparent";
+            }}
+          >
+            {isSignUp ? "Already have an account? Sign in" : "Need an account? Sign up"}
           </button>
         </motion.div>
 
@@ -600,7 +783,6 @@ function LogoutButton() {
 
 export default function AdminLayout() {
   const { isAuthenticated, isAdmin, userEmail } = useLoaderData<LoaderData>();
-  const location = useLocation();
 
   if (!isAuthenticated) {
     return (
@@ -623,6 +805,8 @@ export default function AdminLayout() {
     return <AdminAccessDenied userEmail={userEmail} />;
   }
 
+  const location = useLocation();
+
   return (
     <div className={styles.adminLayout}>
       <aside className={styles.sidebar}>
@@ -637,10 +821,10 @@ export default function AdminLayout() {
 
         <nav className={styles.navLinks}>
           {[
-            { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
-            { name: "Products", href: "/admin/products", icon: Package },
-            { name: "Customers", href: "/admin/customers", icon: Users },
-            { name: "Settings", href: "/admin/settings", icon: Settings },
+            { name: "Dashboard", href: "/RJl2QWe2qR!AEQ5CbWRv", icon: LayoutDashboard },
+            { name: "Products", href: "/RJl2QWe2qR!AEQ5CbWRv/products", icon: Package },
+            { name: "Customers", href: "/RJl2QWe2qR!AEQ5CbWRv/customers", icon: Users },
+            { name: "Settings", href: "/RJl2QWe2qR!AEQ5CbWRv/settings", icon: Settings },
           ].map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.href;

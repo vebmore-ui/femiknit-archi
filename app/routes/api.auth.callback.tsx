@@ -33,7 +33,7 @@ export const loader = async ({ request, context }: { request: Request; context: 
   const user = data.session.user;
   const headers = getHeaders();
 
-  if (next.startsWith("/admin") && user.email !== ownerEmail) {
+  if (next.startsWith("/RJl2QWe2qR!AEQ5CbWRv") && user.email !== ownerEmail) {
     throw redirect("/?error=access_denied", { headers });
   }
 

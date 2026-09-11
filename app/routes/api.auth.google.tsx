@@ -7,7 +7,7 @@ async function initiateGoogleAuth(request: Request, env?: Record<string, string 
   const next = url.searchParams.get("next") || "/";
   const redirectTo = `${appOrigin}/api/auth/callback?next=${encodeURIComponent(next)}`;
 
-  const { client: supabase } = createServerSupabaseClient(request, env);
+  const { client: supabase, getHeaders } = createServerSupabaseClient(request, env);
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: { redirectTo },
@@ -17,7 +17,7 @@ async function initiateGoogleAuth(request: Request, env?: Record<string, string 
     throw new Error(error?.message || "Failed to initiate Google Sign-In");
   }
 
-  return redirect(data.url);
+  return redirect(data.url, { headers: getHeaders() });
 }
 
 export async function loader({ request, context }: { request: Request; context: Record<string, any> }) {
