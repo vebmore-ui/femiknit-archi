@@ -6,10 +6,11 @@ import { AuthProvider } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { AuthPromptModal } from "@/components/AuthPromptModal";
 
-export const loader = async () => {
+export const loader = async ({ context }: { context: Record<string, any> }) => {
+  const env = context?.cloudflare?.env as Record<string, string | undefined> | undefined;
   return json({
-    SUPABASE_URL: process.env.SUPABASE_URL,
-    SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY,
+    SUPABASE_URL: env?.SUPABASE_URL || process.env.SUPABASE_URL,
+    SUPABASE_ANON_KEY: env?.SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY,
   });
 };
 

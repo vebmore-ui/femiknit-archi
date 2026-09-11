@@ -1,12 +1,13 @@
 import { redirect, json, type LoaderFunctionArgs } from "@remix-run/node";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({ request, context }: { request: Request; context: Record<string, any> }) => {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
   const next = url.searchParams.get("next") || "/";
   const error = url.searchParams.get("error");
   const errorDescription = url.searchParams.get("error_description");
-  const ownerEmail = process.env.OWNER_EMAIL;
+  const env = context?.cloudflare?.env as Record<string, string | undefined> | undefined;
+  const ownerEmail = env?.OWNER_EMAIL || process.env.OWNER_EMAIL;
 
   if (error) {
     throw redirect(
@@ -20,7 +21,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const { client: supabase, getHeaders } =
     await import("@/lib/supabase-server").then((m) =>
-      m.createServerSupabaseClient(request)
+      m.createServerSupabaseClient(request, env)
     );
   const { data, error: exchangeError } =
     await supabase.auth.exchangeCodeForSession(code);

@@ -104,9 +104,10 @@ type LoaderData = {
   userEmail: string | undefined;
 };
 
-export async function loader({ request }: LoaderFunctionArgs) {
+export async function loader({ request, context }: LoaderFunctionArgs) {
+  const env = (context as any)?.cloudflare?.env as Record<string, string | undefined> | undefined;
   try {
-    const { client: supabase } = createServerSupabaseClient(request);
+    const { client: supabase } = createServerSupabaseClient(request, env);
     const { data: { user }, error } = await supabase.auth.getUser();
 
     if (!user || error) {
@@ -114,7 +115,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }
 
     try {
-      const adminResult = await requireAdmin(request);
+      const adminResult = await requireAdmin(request, env);
       return json({
         isAuthenticated: true,
         isAdmin: true,
@@ -132,13 +133,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
 }
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request, context }: ActionFunctionArgs) {
+  const env = (context as any)?.cloudflare?.env as Record<string, string | undefined> | undefined;
   const formData = await request.formData();
   const phase = formData.get("phase")?.toString() || "login";
 
   if (phase === "logout") {
     try {
-      const { client: supabase } = createServerSupabaseClient(request);
+      const { client: supabase } = createServerSupabaseClient(request, env);
       await supabase.auth.signOut();
     } catch {
       // ignore sign out errors

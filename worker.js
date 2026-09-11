@@ -26,19 +26,21 @@ globalThis.process.env = new Proxy(envTarget, {
   },
 });
 
-import { entry, routes, assets, assetsBuildDirectory, future, mode, publicPath } from "./build/index.js";
+import { entry, routes, assets as serverManifest, assetsBuildDirectory, basename, future, isSpaMode, mode, publicPath } from "./build/server/index.js";
 
 const handler = createRequestHandler(() => ({
   entry: { module: entry.module },
   routes,
-  assets,
+  assets: serverManifest,
   assetsBuildDirectory,
+  basename,
   future,
+  isSpaMode,
   mode,
   publicPath,
 }));
 
-function serializeError(error: unknown): Record<string, unknown> {
+function serializeError(error) {
   if (error instanceof Error) {
     return {
       message: error.message,
@@ -56,7 +58,7 @@ function serializeError(error: unknown): Record<string, unknown> {
   return { message: String(error) };
 }
 
-function logError(error: unknown, request: Request) {
+function logError(error, request) {
   const errorInfo = serializeError(error);
   const url = new URL(request.url);
   console.error(JSON.stringify({
@@ -73,7 +75,7 @@ function logError(error: unknown, request: Request) {
   }));
 }
 
-function handleFavicon(request: Request): Response | null {
+function handleFavicon(request) {
   const url = new URL(request.url);
   if (url.pathname === "/favicon.ico") {
     const svgUrl = new URL("/favicon.svg", request.url);

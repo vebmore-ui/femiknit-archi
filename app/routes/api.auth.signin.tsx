@@ -1,7 +1,7 @@
 import { json } from "@remix-run/node";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 
-export async function action({ request }: { request: Request }) {
+export async function action({ request, context }: { request: Request; context: Record<string, any> }) {
   if (request.method !== "POST") {
     return json({ error: "Method not allowed" }, { status: 405 });
   }
@@ -14,7 +14,8 @@ export async function action({ request }: { request: Request }) {
       return json({ error: "Email and password are required" }, { status: 400 });
     }
 
-    const supabase = getSupabaseServerClient();
+    const env = context?.cloudflare?.env as Record<string, string | undefined> | undefined;
+    const supabase = getSupabaseServerClient(env);
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {

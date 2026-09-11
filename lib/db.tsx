@@ -27,14 +27,14 @@ export type Product = {
 
 let cachedSupabase: ReturnType<typeof getSupabaseServerClient> | null = null;
 
-function getSupabase() {
+function getSupabase(env?: Record<string, string | undefined>) {
   if (!cachedSupabase) {
     try {
-      cachedSupabase = getSupabaseServerClient();
+      cachedSupabase = getSupabaseServerClient(env);
     } catch {
       console.warn("Service role key not available, using anon client.");
-      const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-      const key = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+      const url = env?.SUPABASE_URL || process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+      const key = env?.SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
       if (!url || !key) {
         throw new Error("Missing Supabase credentials in environment variables.");
       }
@@ -104,8 +104,8 @@ async function ensureImageUrls(productId: string, images: string[]): Promise<str
   return result;
 }
 
-export async function getAllProducts(): Promise<Product[]> {
-  const supabase = getSupabase();
+export async function getAllProducts(env?: Record<string, string | undefined>): Promise<Product[]> {
+  const supabase = getSupabase(env);
   const { data: products, error } = await supabase
     .from("products")
     .select("*")
@@ -123,8 +123,8 @@ export async function getAllProducts(): Promise<Product[]> {
   return products.map(mapSupabaseProduct);
 }
 
-export async function getProductById(id: string): Promise<Product | undefined> {
-  const supabase = getSupabase();
+export async function getProductById(id: string, env?: Record<string, string | undefined>): Promise<Product | undefined> {
+  const supabase = getSupabase(env);
   const { data, error } = await supabase
     .from("products")
     .select("*")
@@ -145,8 +145,8 @@ export async function getProductById(id: string): Promise<Product | undefined> {
   return product;
 }
 
-export async function createProduct(product: Omit<Product, "id">): Promise<Product> {
-  const supabase = getSupabase();
+export async function createProduct(product: Omit<Product, "id">, env?: Record<string, string | undefined>): Promise<Product> {
+  const supabase = getSupabase(env);
   const newId = `PROD-${Date.now()}`;
 
   console.log("=== CREATING PRODUCT IN SUPABASE ===");
@@ -212,8 +212,8 @@ export async function createProduct(product: Omit<Product, "id">): Promise<Produ
   return created;
 }
 
-export async function updateProduct(id: string, updates: Partial<Omit<Product, "id">>): Promise<Product | undefined> {
-  const supabase = getSupabase();
+export async function updateProduct(id: string, updates: Partial<Omit<Product, "id">>, env?: Record<string, string | undefined>): Promise<Product | undefined> {
+  const supabase = getSupabase(env);
   const dbUpdates: Record<string, unknown> = {};
 
   if (updates.name !== undefined) dbUpdates.name = updates.name;
@@ -267,8 +267,8 @@ export async function updateProduct(id: string, updates: Partial<Omit<Product, "
   return updated;
 }
 
-export async function deleteProduct(id: string): Promise<boolean> {
-  const supabase = getSupabase();
+export async function deleteProduct(id: string, env?: Record<string, string | undefined>): Promise<boolean> {
+  const supabase = getSupabase(env);
   const { error } = await supabase
     .from("products")
     .delete()

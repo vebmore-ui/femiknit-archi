@@ -2,17 +2,20 @@ import { json } from "@remix-run/node";
 import { getProductById, updateProduct, deleteProduct } from "@/lib/db";
 import { requireAdmin } from "@/lib/supabase-server";
 
-export async function loader({ params }: { params: { id: string } }) {
-  const product = await getProductById(params.id);
+export async function loader({ params, context }: { params: { id: string }; context: Record<string, any> }) {
+  const env = context?.cloudflare?.env as Record<string, string | undefined> | undefined;
+  const product = await getProductById(params.id, env);
   if (!product) {
     return json({ error: "Product not found" }, { status: 404 });
   }
   return json(product);
 }
 
-export async function action({ params, request }: { params: { id: string }; request: Request }) {
+export async function action({ params, request, context }: { params: { id: string }; request: Request; context: Record<string, any> }) {
+  const env = context?.cloudflare?.env as Record<string, string | undefined> | undefined;
+
   try {
-    await requireAdmin(request);
+    await requireAdmin(request, env);
   } catch (err) {
     if (err instanceof Response) {
       return json({ error: "Admin access required" }, { status: err.status });
@@ -23,7 +26,7 @@ export async function action({ params, request }: { params: { id: string }; requ
   if (request.method === "PUT") {
     try {
       const body = await request.json();
-      const product = await updateProduct(params.id, body);
+      const product = await updateProduct(params.id, body, env);
       if (!product) {
         return json({ error: "Product not found" }, { status: 404 });
       }
@@ -37,7 +40,7 @@ export async function action({ params, request }: { params: { id: string }; requ
 
   if (request.method === "DELETE") {
     try {
-      const deleted = await deleteProduct(params.id);
+      const deleted = await deleteProduct(params.id, env);
       if (!deleted) {
         return json({ error: "Product not found" }, { status: 404 });
       }

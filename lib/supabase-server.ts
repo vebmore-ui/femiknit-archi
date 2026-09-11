@@ -4,20 +4,20 @@ import { serialize } from "cookie";
 
 const ONE_YEAR_MAX_AGE = 60 * 60 * 24 * 365;
 
-function getSupabaseUrl(): string {
-  const url = process.env.SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
+function getSupabaseUrl(env?: Record<string, string | undefined>): string {
+  const url = env?.SUPABASE_URL || process.env.SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
   if (!url) throw new Error("Missing SUPABASE_URL");
   return url;
 }
 
-function getSupabaseAnonKey(): string {
-  const key = process.env.SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
+function getSupabaseAnonKey(env?: Record<string, string | undefined>): string {
+  const key = env?.SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
   if (!key) throw new Error("Missing SUPABASE_ANON_KEY");
   return key;
 }
 
-function getSupabaseServiceKey(): string {
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+function getSupabaseServiceKey(env?: Record<string, string | undefined>): string {
+  const key = env?.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!key) throw new Error("Missing Supabase server credentials. Please add SUPABASE_SERVICE_ROLE_KEY to your .env file.");
   return key;
 }
@@ -38,9 +38,9 @@ function parseCookies(cookieHeader: string | null): Record<string, string> {
   }, {} as Record<string, string>);
 }
 
-export function getSupabaseServerClient(): SupabaseClient {
-  const supabaseUrl = getSupabaseUrl();
-  const supabaseServiceKey = getSupabaseServiceKey();
+export function getSupabaseServerClient(env?: Record<string, string | undefined>): SupabaseClient {
+  const supabaseUrl = getSupabaseUrl(env);
+  const supabaseServiceKey = getSupabaseServiceKey(env);
   return createClient(supabaseUrl, supabaseServiceKey, {
     auth: {
       autoRefreshToken: false,
@@ -49,9 +49,9 @@ export function getSupabaseServerClient(): SupabaseClient {
   });
 }
 
-export function createServerSupabaseClient(request: Request) {
-  const supabaseUrl = getSupabaseUrl();
-  const supabaseAnonKey = getSupabaseAnonKey();
+export function createServerSupabaseClient(request: Request, env?: Record<string, string | undefined>) {
+  const supabaseUrl = getSupabaseUrl(env);
+  const supabaseAnonKey = getSupabaseAnonKey(env);
   const cookies = parseCookies(request.headers.get("cookie"));
   const responseCookies: { name: string; value: string; options: Record<string, unknown> }[] = [];
 
@@ -97,10 +97,10 @@ export function createServerSupabaseClient(request: Request) {
   };
 }
 
-export async function requireOwner(request: Request): Promise<{ user: { id: string; email?: string | null }; headers: Headers }> {
-  const supabaseUrl = getSupabaseUrl();
-  const supabaseAnonKey = getSupabaseAnonKey();
-  const ownerEmail = process.env.OWNER_EMAIL;
+export async function requireOwner(request: Request, env?: Record<string, string | undefined>): Promise<{ user: { id: string; email?: string | null }; headers: Headers }> {
+  const supabaseUrl = getSupabaseUrl(env);
+  const supabaseAnonKey = getSupabaseAnonKey(env);
+  const ownerEmail = env?.OWNER_EMAIL || process.env.OWNER_EMAIL;
 
   if (!ownerEmail) {
     throw new Response("Not Found", { status: 404, statusText: "Not Found" });
@@ -155,10 +155,10 @@ export async function requireOwner(request: Request): Promise<{ user: { id: stri
   return { user, headers };
 }
 
-export async function requireAdmin(request: Request): Promise<{ user: { id: string; email?: string | null }; headers: Headers }> {
-  const supabaseUrl = getSupabaseUrl();
-  const supabaseAnonKey = getSupabaseAnonKey();
-  const serviceRoleKey = getSupabaseServiceKey();
+export async function requireAdmin(request: Request, env?: Record<string, string | undefined>): Promise<{ user: { id: string; email?: string | null }; headers: Headers }> {
+  const supabaseUrl = getSupabaseUrl(env);
+  const supabaseAnonKey = getSupabaseAnonKey(env);
+  const serviceRoleKey = getSupabaseServiceKey(env);
 
   const cookies = parseCookies(request.headers.get("cookie"));
   const responseCookies: { name: string; value: string; options: Record<string, unknown> }[] = [];
@@ -209,7 +209,7 @@ export async function requireAdmin(request: Request): Promise<{ user: { id: stri
     .ilike("email", user.email)
     .maybeSingle();
 
-  console.log(`[requireAdmin diagnostics] authenticatedEmail=${user.email} adminFound=${!!adminUser} adminError=${adminError ? adminError.message : "none"}`);
+  console.log(`[requireAdmin diagnostics] SUPABASE_URL configured: ${Boolean(env?.SUPABASE_URL || process.env.SUPABASE_URL)} SUPABASE_ANON_KEY configured: ${Boolean(env?.SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY)} SUPABASE_SERVICE_ROLE_KEY configured: ${Boolean(env?.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)} authenticatedEmail=${user.email} adminFound=${!!adminUser} adminError=${adminError ? adminError.message : "none"}`);
 
   if (adminError || !adminUser) {
     throw new Response("Forbidden", { status: 403, statusText: "Forbidden" });

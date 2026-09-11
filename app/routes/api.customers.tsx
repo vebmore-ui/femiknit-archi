@@ -1,13 +1,14 @@
 import { json } from "@remix-run/node";
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
-const supabase = supabaseUrl && supabaseAnonKey
-  ? createClient(supabaseUrl, supabaseAnonKey)
-  : null;
+export async function loader({ context }: { context: Record<string, any> }) {
+  const env = context?.cloudflare?.env as Record<string, string | undefined> | undefined;
+  const supabaseUrl = env?.SUPABASE_URL || process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const supabaseAnonKey = env?.SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+  const supabase = supabaseUrl && supabaseAnonKey
+    ? createClient(supabaseUrl, supabaseAnonKey)
+    : null;
 
-export async function loader() {
   if (!supabase) {
     return json([]);
   }
@@ -28,7 +29,14 @@ export async function loader() {
   }
 }
 
-export async function action({ request }: { request: Request }) {
+export async function action({ request, context }: { request: Request; context: Record<string, any> }) {
+  const env = context?.cloudflare?.env as Record<string, string | undefined> | undefined;
+  const supabaseUrl = env?.SUPABASE_URL || process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const supabaseAnonKey = env?.SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+  const supabase = supabaseUrl && supabaseAnonKey
+    ? createClient(supabaseUrl, supabaseAnonKey)
+    : null;
+
   if (request.method !== "POST") {
     return json({ error: "Method not allowed" }, { status: 405 });
   }
