@@ -203,13 +203,16 @@ export async function requireAdmin(request: Request, env?: Record<string, string
     },
   });
 
+  const normalizedEmail = user.email.trim().toLowerCase();
+
   const { data: adminUser, error: adminError } = await adminSupabase
     .from("admin_users")
     .select("email")
-    .ilike("email", user.email)
+    .eq("email", normalizedEmail)
+    .eq("role", "admin")
     .maybeSingle();
 
-  console.log(`[requireAdmin diagnostics] SUPABASE_URL configured: ${Boolean(env?.SUPABASE_URL || process.env.SUPABASE_URL)} SUPABASE_ANON_KEY configured: ${Boolean(env?.SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY)} SUPABASE_SERVICE_ROLE_KEY configured: ${Boolean(env?.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)} authenticatedEmail=${user.email} adminFound=${!!adminUser} adminError=${adminError ? adminError.message : "none"}`);
+  console.log(`[requireAdmin diagnostics] SUPABASE_URL configured: ${Boolean(env?.SUPABASE_URL || process.env.SUPABASE_URL)} SUPABASE_ANON_KEY configured: ${Boolean(env?.SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY)} SUPABASE_SERVICE_ROLE_KEY configured: ${Boolean(env?.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)} authenticatedEmail=${user.email} normalizedEmail=${normalizedEmail} adminFound=${!!adminUser} adminError=${adminError ? adminError.message : "none"}`);
 
   if (adminError || !adminUser) {
     throw new Response("Forbidden", { status: 403, statusText: "Forbidden" });
