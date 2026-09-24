@@ -16,7 +16,7 @@ export function Header() {
   return (
     <>
       <header className="sticky top-0 z-50 border-b border-gray-100 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md">
-        <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6">
+        <div className="w-full px-3 py-2 sm:px-6">
           <div className="relative flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <button
@@ -28,8 +28,8 @@ export function Header() {
                 <Menu size={20} />
               </button>
 
-              <Link to="/" className="flex items-center gap-2">
-                <img src="/images/logo.png" alt="Femiknit" className="h-16 w-24 object-contain sm:h-20 sm:w-32" />
+              <Link to="/" className="flex items-center">
+                <img src="/images/logo.png" alt="Femiknit" className="h-14 w-auto object-contain sm:h-16" />
               </Link>
             </div>
 
@@ -146,8 +146,8 @@ export function Header() {
               transition={{ type: "spring", damping: 26, stiffness: 260 }}
             >
               <div className="mb-6 flex items-center justify-between">
-                <Link to="/" className="flex items-center gap-2" onClick={() => setMenuOpen(false)}>
-                  <img src="/images/logo.png" alt="Femiknit" className="h-16 w-24 object-contain" />
+                <Link to="/" className="flex items-center" onClick={() => setMenuOpen(false)}>
+                  <img src="/images/logo.png" alt="Femiknit" className="h-14 w-auto object-contain" />
                 </Link>
                 <button className="rounded-full p-2 text-gray-700 dark:text-slate-200" onClick={() => setMenuOpen(false)} aria-label="Close navigation">
                   <X size={21} />
