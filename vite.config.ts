@@ -5,20 +5,26 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, statSync } from "fs";
 import { join } from "path";
 
 function copyPublicAssets() {
+  function copyDir(srcDir, destDir) {
+    if (!existsSync(srcDir)) return;
+    if (!existsSync(destDir)) mkdirSync(destDir, { recursive: true });
+    for (const entry of readdirSync(srcDir)) {
+      const src = join(srcDir, entry);
+      const dest = join(destDir, entry);
+      if (statSync(src).isFile()) {
+        copyFileSync(src, dest);
+      } else if (statSync(src).isDirectory()) {
+        copyDir(src, dest);
+      }
+    }
+  }
+
   return {
     name: "copy-public-assets",
     closeBundle() {
       const publicDir = join(process.cwd(), "public");
       const outDir = join(process.cwd(), "build", "client");
-      if (!existsSync(publicDir)) return;
-      if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true });
-      for (const file of readdirSync(publicDir)) {
-        const src = join(publicDir, file);
-        const dest = join(outDir, file);
-        if (statSync(src).isFile()) {
-          copyFileSync(src, dest);
-        }
-      }
+      copyDir(publicDir, outDir);
     },
   };
 }
