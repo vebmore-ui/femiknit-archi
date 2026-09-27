@@ -51,6 +51,8 @@ export default function SettingsAndConfigurations() {
   const [newCta, setNewCta] = useState("");
   const [newLink, setNewLink] = useState("");
   const [newStatus, setNewStatus] = useState("Active");
+  const [newImage, setNewImage] = useState("");
+  const [imageSizeWarning, setImageSizeWarning] = useState("");
 
   const showToast = useCallback((msg: string) => {
     setToastMessage(msg);
@@ -79,6 +81,11 @@ export default function SettingsAndConfigurations() {
     e.preventDefault();
     if (!newTitle.trim()) return;
 
+    if (!newImage) {
+      setImageSizeWarning("Please provide a banner image URL.");
+      return;
+    }
+
     try {
       const res = await fetch("/api/banners", {
         method: "POST",
@@ -90,7 +97,7 @@ export default function SettingsAndConfigurations() {
           cta: newCta,
           link: newLink || "/",
           status: newStatus,
-          image: "default-banner.jpg"
+          image: newImage
         })
       });
       if (res.ok) {
@@ -101,6 +108,7 @@ export default function SettingsAndConfigurations() {
         setNewBadge("");
         setNewCta("");
         setNewLink("");
+        setNewImage("");
         setIsModalOpen(false);
         showToast("New promotional banner added.");
       } else {
@@ -196,16 +204,18 @@ export default function SettingsAndConfigurations() {
                   <Plus size={15} /> Add Banner
                 </button>
               </div>
-              <div
-                className={styles.uploadArea}
-                onClick={() => setIsModalOpen(true)}
-              >
-                <div className={styles.uploadIcon}>
-                  <Plus size={22} />
+                <div
+                  className={styles.uploadArea}
+                  onClick={() => setIsModalOpen(true)}
+                >
+                  <div className={styles.uploadIcon}>
+                    <Plus size={22} />
+                  </div>
+                  <p className={styles.uploadText}>Click to add a new promotional banner</p>
+                  <p className={styles.uploadHint}>
+                    Upload at <strong>1920 x 1080 px (16:9)</strong>. Banners display full-width on the home page slideshow (560px mobile / 78vh desktop).
+                  </p>
                 </div>
-                <p className={styles.uploadText}>Click to add a new promotional banner</p>
-                <p className={styles.uploadHint}>Configure title, route link, and status.</p>
-              </div>
             </div>
 
             {/* Active Banners List */}
@@ -334,6 +344,27 @@ export default function SettingsAndConfigurations() {
                       onChange={(e) => setNewLink(e.target.value)}
                       className={styles.modalInput}
                     />
+                  </div>
+
+                  <div className={styles.inputGroup}>
+                    <label className={styles.label}>Banner Image URL</label>
+                    <input
+                      type="url"
+                      placeholder="e.g. https://example.com/banner-image.jpg"
+                      value={newImage}
+                      onChange={(e) => {
+                        setNewImage(e.target.value);
+                        setImageSizeWarning("");
+                      }}
+                      className={styles.modalInput}
+                      required
+                    />
+                    <p className={styles.uploadHint} style={{ marginTop: '0.5rem' }}>
+                      Recommended size: <strong>1920 x 1080 px (16:9)</strong>. This ensures banners display optimally on the home page slideshow (full width, height: 560px mobile / 78vh desktop).
+                    </p>
+                    {imageSizeWarning && (
+                      <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>{imageSizeWarning}</p>
+                    )}
                   </div>
 
                   <div className={styles.inputGroup}>

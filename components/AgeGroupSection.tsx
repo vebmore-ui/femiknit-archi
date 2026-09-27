@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
+import { Link } from "@remix-run/react";
 
 type AgeGroup = {
   title: string;
@@ -54,8 +55,7 @@ export function AgeGroupSection() {
 
       <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
         {groups.map((group, index) => (
-          <motion.a
-            href="#shop"
+          <motion.div
             key={group.title}
             className="group text-center"
             initial={{ opacity: 0, y: 18 }}
@@ -63,16 +63,18 @@ export function AgeGroupSection() {
             viewport={{ once: true }}
             transition={{ duration: 0.45, delay: index * 0.06 }}
           >
-            <div
-              className={`mx-auto aspect-square w-full max-w-56 overflow-hidden rounded-full border-4 sm:max-w-60 ${
-                index % 2 ? "border-rose-600" : "border-amber-400"
-              } shadow-md transition-all duration-500 group-hover:rotate-3 group-hover:border-rose-600`}
-            >
-              <img src={group.image} alt={group.title} width={500} height={500} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-            </div>
+            <Link to={`/collections?ageGroup=${encodeURIComponent(group.title)}`} className="block">
+              <div
+                className={`mx-auto aspect-square w-full max-w-56 overflow-hidden rounded-full border-4 sm:max-w-60 ${
+                  index % 2 ? "border-rose-600" : "border-amber-400"
+                } shadow-md transition-all duration-500 group-hover:rotate-3 group-hover:border-rose-600`}
+              >
+                <img src={group.image} alt={group.title} width={500} height={500} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+              </div>
+            </Link>
             <h3 className="mt-4 font-serif text-xl text-gray-950 sm:text-2xl">{group.title}</h3>
             <p className="mt-1 text-sm text-gray-500">{group.copy}</p>
-          </motion.a>
+          </motion.div>
         ))}
       </div>
     </section>

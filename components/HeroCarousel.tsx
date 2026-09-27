@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Link } from "@remix-run/react";
 
 type HeroSlide = {
   id?: string;
@@ -9,6 +10,7 @@ type HeroSlide = {
   cta: string;
   badge: string;
   image: string;
+  link: string;
 };
 
 export function HeroCarousel() {
@@ -22,13 +24,14 @@ export function HeroCarousel() {
         const res = await fetch("/api/banners");
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
-          const mapped = data.map((b: { id?: string; title: string; subtitle: string; cta: string; badge: string; image: string }) => ({
+          const mapped = data.map((b: { id?: string; title: string; subtitle: string; cta: string; badge: string; image: string; link: string }) => ({
             id: b.id,
             title: b.title,
             subtitle: b.subtitle,
             cta: b.cta,
             badge: b.badge,
-            image: b.image
+            image: b.image,
+            link: b.link || "/"
           }));
           setSlides(mapped);
           setLoading(false);
@@ -105,9 +108,9 @@ export function HeroCarousel() {
           </span>
           <h1 className="font-serif text-3xl font-bold leading-tight sm:text-5xl lg:text-7xl">{slide.title}</h1>
           <p className="mt-5 max-w-xl text-base leading-7 text-white/90 sm:text-lg">{slide.subtitle}</p>
-          <button className="mt-6 rounded-full bg-rose-600 px-6 py-3 font-semibold text-white transition-all duration-300 hover:scale-105 hover:bg-rose-700 sm:mt-8">
+          <Link to={slide.link || "/"} className="mt-6 inline-flex items-center rounded-full bg-rose-600 px-6 py-3 font-semibold text-white transition hover:bg-rose-700 hover:scale-105">
             {slide.cta}
-          </button>
+          </Link>
         </motion.div>
       </div>
 

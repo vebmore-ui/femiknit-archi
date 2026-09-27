@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { ToranSvg } from "@/components/Motifs";
+import { Link } from "@remix-run/react";
 
 export function FestiveFeature() {
   return (
@@ -21,10 +22,13 @@ export function FestiveFeature() {
             <p className="mt-5 max-w-2xl text-base leading-7 text-gray-600">
               A celebratory drop of marigold accents, crimson borders, airy cottons, and silk-blend pieces designed for rituals, family portraits, and long evenings.
             </p>
-            <button className="mt-7 inline-flex items-center gap-2 rounded-full bg-rose-600 px-6 py-3 font-semibold text-white transition hover:bg-rose-700">
+            <Link
+              to="/collections/festive"
+              className="mt-7 inline-flex items-center gap-2 rounded-full bg-rose-600 px-6 py-3 font-semibold text-white transition hover:bg-rose-700"
+            >
               Shop Festive Collection
               <ArrowRight size={18} />
-            </button>
+            </Link>
           </motion.div>
 
           <motion.div
