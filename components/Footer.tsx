@@ -30,7 +30,7 @@ export function Footer() {
                 <Mail size={18} className="text-rose-700" />
                 <input id="newsletter" className="min-w-0 flex-1 bg-transparent px-3 text-sm outline-none" placeholder="you@example.com" type="email" />
               </div>
-              <button className="rounded-full bg-amber-500 px-6 py-3 text-sm font-bold text-rose-950 transition hover:bg-amber-400" type="button">
+              <button className="rounded-full bg-amber-500 px-6 py-3 text-sm font-bold text-rose-950 transition hover:bg-amber-400" type="button" onClick={() => window.location.href = 'mailto:support@femiknit.com'}>
                 Contact Us
               </button>
             </form>

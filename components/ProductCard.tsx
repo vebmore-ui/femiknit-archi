@@ -1,18 +1,13 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Heart, ShoppingBag, Eye, Zap, X } from "lucide-react";
+import { Heart, ShoppingBag, Eye, Zap } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Link } from "@remix-run/react";
 import type { Product } from "@/lib/constants";
 import { useStore } from "@/context/StoreContext";
-import { useAuth } from "@/context/AuthContext";
 
 export function ProductCard({ product, index, onViewDetails }: { product: Product; index: number; onViewDetails?: () => void }) {
-  const { addToCart, toggleWishlist, wishlist, cartToast } = useStore();
-  const { user } = useAuth();
+  const { addToCart, toggleWishlist, wishlist } = useStore();
   const [hovered, setHovered] = useState(false);
   const [imageIndex, setImageIndex] = useState(0);
-  const [showLoginModal, setShowLoginModal] = useState(false);
-  const [pendingAction, setPendingAction] = useState<"cart" | "buy" | null>(null);
   const loved = wishlist.has(product.id);
   const mounted = useRef(false);
 
@@ -32,11 +27,6 @@ export function ProductCard({ product, index, onViewDetails }: { product: Produc
   }, [hovered, product.images.length]);
 
   const handleAddToCart = () => {
-    if (!user) {
-      setPendingAction("cart");
-      setShowLoginModal(true);
-      return;
-    }
     addToCart({
       id: product.id,
       title: product.title,
@@ -49,41 +39,13 @@ export function ProductCard({ product, index, onViewDetails }: { product: Produc
   };
 
   const handleBuyNow = () => {
-    if (!user) {
-      setPendingAction("buy");
-      setShowLoginModal(true);
-      return;
-    }
-    addToCart({
-      id: product.id,
-      title: product.title,
-      price: product.price,
-      mrp: product.mrp,
-      image: product.images[0],
-      size: product.size[0] || "Free Size",
-      color: product.colors[0]?.name || "Default",
-    }, 1);
-    window.dispatchEvent(new CustomEvent("open-cart"));
+    const message = `Hi, I'm interested in buying:\n\n*${product.title}*\nPrice: Rs ${product.price.toLocaleString("en-IN")}${product.mrp > product.price ? ` (MRP: Rs ${product.mrp.toLocaleString("en-IN")})` : ""}\n\nPlease confirm availability and delivery.`;
+    const whatsappUrl = `https://wa.me/919876543210?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, "_blank");
   };
 
   const handleToggleWishlist = () => {
-    if (!user) {
-      setPendingAction("cart");
-      setShowLoginModal(true);
-      return;
-    }
     toggleWishlist(product.id);
-  };
-
-  const handleGoBack = () => {
-    setShowLoginModal(false);
-    setPendingAction(null);
-  };
-
-  const handleRegister = () => {
-    setShowLoginModal(false);
-    setPendingAction(null);
-    window.location.href = "/signup";
   };
 
   return (
@@ -121,13 +83,13 @@ export function ProductCard({ product, index, onViewDetails }: { product: Produc
           </span>
           <button
             className={`absolute right-3 top-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/90 shadow-sm transition ${
-              user ? (loved ? "text-rose-600" : "text-gray-600 hover:text-rose-600") : "text-gray-400 cursor-default"
+              loved ? "text-rose-600" : "text-gray-600 hover:text-rose-600"
             }`}
             type="button"
             aria-label="Toggle wishlist"
             onClick={handleToggleWishlist}
           >
-            <Heart size={19} fill={loved && user ? "currentColor" : "none"} />
+            <Heart size={19} fill={loved ? "currentColor" : "none"} />
           </button>
 
           <div className="absolute bottom-3 left-3 right-3 flex gap-1.5">
@@ -181,45 +143,7 @@ export function ProductCard({ product, index, onViewDetails }: { product: Produc
             </button>
           </div>
         </div>
-      </motion.article>
-
-      {/* Login Prompt Modal */}
-      <AnimatePresence>
-        {showLoginModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl text-center"
-            >
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-rose-100 text-rose-700">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-                  <polyline points="10 17 15 12 10 7" />
-                  <line x1="15" y1="12" x2="3" y2="12" />
-                </svg>
-              </div>
-              <h3 className="font-serif text-xl font-semibold text-gray-950 mb-2">You have not logged in</h3>
-              <p className="text-sm text-gray-500 mb-6">Please login or create an account to continue with your purchase.</p>
-              <div className="flex gap-3">
-                <button
-                  onClick={handleGoBack}
-                  className="flex-1 rounded-full border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-                >
-                  Go Back
-                </button>
-                <Link
-                  to="/signup"
-                  className="flex-1 rounded-full bg-rose-800 px-4 py-2.5 text-center text-sm font-medium text-white transition hover:bg-rose-900"
-                >
-                  Register
-                </Link>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+        </motion.article>
     </>
   );
 }

@@ -1,13 +1,12 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ShoppingBag, Plus, Minus, Trash2, X, ChevronUp, ChevronDown, Phone, MapPin, AlertCircle } from "lucide-react";
+import { ShoppingBag, Plus, Minus, Trash2, X, ChevronUp, ChevronDown } from "lucide-react";
 import { Link } from "@remix-run/react";
 import { useStore } from "@/context/StoreContext";
 import { useAuth } from "@/context/AuthContext";
 
 export function FloatingCart() {
   const [isOpen, setIsOpen] = useState(false);
-  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const { cartItems, cartCount, cartTotal, cartToast, removeFromCart, updateCartQuantity, clearCart } = useStore();
   const { user } = useAuth();
 
@@ -31,13 +30,8 @@ export function FloatingCart() {
     const phone = getUserPhone();
     const address = getUserAddress();
 
-    if (!phone || !address) {
-      setShowCheckoutModal(true);
-      return;
-    }
-
     const itemsText = cartItems.map(item => `• ${item.title} (${item.size} / ${item.color}) x${item.quantity} - ₹${item.price * item.quantity}`).join("\n");
-    const message = `*New Order from Femiknit*\n\n*Items:*\n${itemsText}\n\n*Total:* ₹${cartTotal.toLocaleString("en-IN")}\n\n*Phone:* ${phone}\n*Address:* ${address}`;
+    const message = `*New Order from Femiknit*\n\n*Items:*\n${itemsText}\n\n*Total:* ₹${cartTotal.toLocaleString("en-IN")}${phone ? `\n*Phone:* ${phone}` : ""}${address ? `\n*Address:* ${address}` : ""}`;
     const whatsappUrl = `https://wa.me/919876543210?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, "_blank");
   };
@@ -138,26 +132,26 @@ export function FloatingCart() {
               )}
             </div>
 
-            {cartItems.length > 0 && (
-              <div className="border-t border-gray-100 bg-gray-50/50 px-5 py-4">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-medium text-gray-600">Grand Total</span>
-                  <span className="text-lg font-bold text-rose-700">₹{cartTotal.toLocaleString("en-IN")}</span>
-                </div>
-                <button
-                  onClick={handleCheckout}
-                  className="w-full rounded-xl bg-rose-800 px-4 py-3 text-sm font-semibold text-white transition hover:bg-rose-900"
-                >
-                  Checkout via WhatsApp
-                </button>
-                <button
-                  onClick={clearCart}
-                  className="w-full mt-2 rounded-xl border border-gray-200 px-4 py-2.5 text-xs font-medium text-gray-600 transition hover:bg-gray-100"
-                >
-                  Clear Cart
-                </button>
-              </div>
-            )}
+               {cartItems.length > 0 && (
+               <div className="border-t border-gray-100 bg-gray-50/50 px-5 py-4">
+                 <div className="flex items-center justify-between mb-3">
+                   <span className="text-sm font-medium text-gray-600">Grand Total</span>
+                   <span className="text-lg font-bold text-rose-700">₹{cartTotal.toLocaleString("en-IN")}</span>
+                 </div>
+                 <button
+                   onClick={handleCheckout}
+                   className="w-full rounded-xl bg-rose-800 px-4 py-3 text-sm font-semibold text-white transition hover:bg-rose-900"
+                 >
+                   Buy Now
+                 </button>
+                 <button
+                   onClick={clearCart}
+                   className="w-full mt-2 rounded-xl border border-gray-200 px-4 py-2.5 text-xs font-medium text-gray-600 transition hover:bg-gray-100"
+                 >
+                   Clear Cart
+                 </button>
+               </div>
+             )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -172,65 +166,6 @@ export function FloatingCart() {
             style={{ transform: "translateX(-50%)" }}
           >
             {cartToast}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Checkout Info Modal */}
-      <AnimatePresence>
-        {showCheckoutModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-            onClick={() => setShowCheckoutModal(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              transition={{ duration: 0.2 }}
-              className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="mb-4 flex items-center gap-3">
-                <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 text-rose-700">
-                  <AlertCircle size={20} />
-                </div>
-                <div>
-                  <h3 className="font-serif text-lg font-bold text-gray-900">Complete Your Profile</h3>
-                  <p className="text-sm text-gray-500">Please add your contact details to proceed with checkout</p>
-                </div>
-              </div>
-
-              <div className="space-y-3 mb-6">
-                <div className="flex items-start gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
-                  <Phone size={18} className="text-gray-400 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Phone Number</p>
-                    <p className="text-xs text-gray-500">Required for delivery updates</p>
-                  </div>
-                  {!getUserPhone() && <span className="ml-auto text-xs font-semibold text-red-600">Missing</span>}
-                </div>
-                <div className="flex items-start gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
-                  <MapPin size={18} className="text-gray-400 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Delivery Address</p>
-                    <p className="text-xs text-gray-500">Required for order delivery</p>
-                  </div>
-                  {!getUserAddress() && <span className="ml-auto text-xs font-semibold text-red-600">Missing</span>}
-                </div>
-              </div>
-
-              <Link
-                to="/account"
-                onClick={() => setShowCheckoutModal(false)}
-                className="flex w-full items-center justify-center gap-2 rounded-full bg-rose-800 px-6 py-3 text-sm font-semibold text-white transition hover:bg-rose-900"
-              >
-                Go to My Account
-              </Link>
-            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
