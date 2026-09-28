@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "@remix-run/react";
+import { getBanners } from "@/lib/banners-client";
 
 type HeroSlide = {
   id?: string;
@@ -19,10 +20,10 @@ export function HeroCarousel() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadSlides = async () => {
+    const loadSlides = () => {
+      setLoading(true);
       try {
-        const res = await fetch("/api/banners");
-        const data = await res.json();
+        const data = getBanners();
         if (Array.isArray(data) && data.length > 0) {
           const mapped = data.map((b: { id?: string; title: string; subtitle: string; cta: string; badge: string; image: string; link: string }) => ({
             id: b.id,
@@ -34,18 +35,8 @@ export function HeroCarousel() {
             link: b.link || "/"
           }));
           setSlides(mapped);
-          setLoading(false);
-          return;
-        }
-      } catch {
-        // fallback to hero-slides below
-      }
-
-      try {
-        const res = await fetch("/api/hero-slides");
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          setSlides(data);
+        } else {
+          setSlides([]);
         }
       } catch {
         setSlides([]);

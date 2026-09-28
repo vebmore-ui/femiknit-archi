@@ -11,6 +11,7 @@ import {
   AlertTriangle
 } from "lucide-react";
 import styles from "../admin/settings/page.module.css";
+import { getBanners, saveBanner, deleteBanner } from "@/lib/banners-client";
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -71,10 +72,9 @@ export default function SettingsAndConfigurations() {
     setTimeout(() => setToastMessage(null), 3500);
   }, []);
 
-  const loadBanners = useCallback(async () => {
+  const loadBanners = useCallback(() => {
     try {
-      const res = await fetch("/api/banners");
-      const data = await res.json();
+      const data = getBanners();
       if (Array.isArray(data)) {
         setBanners(data);
       }
@@ -89,7 +89,7 @@ export default function SettingsAndConfigurations() {
     loadBanners();
   }, [loadBanners]);
 
-  const handleAddBanner = async (e: React.FormEvent) => {
+  const handleAddBanner = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) return;
 
@@ -99,35 +99,27 @@ export default function SettingsAndConfigurations() {
     }
 
     try {
-      const res = await fetch("/api/banners", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: newTitle,
-          subtitle: newSubtitle,
-          badge: newBadge,
-          cta: newCta,
-          link: newLink || "/",
-          status: newStatus,
-          image: newImage
-        })
+      const created = saveBanner({
+        title: newTitle,
+        subtitle: newSubtitle,
+        badge: newBadge,
+        cta: newCta,
+        link: newLink || "/",
+        status: newStatus,
+        image: newImage
       });
-      if (res.ok) {
-        const created = await res.json();
-        setBanners([created, ...banners]);
-        setNewTitle("");
-        setNewSubtitle("");
-        setNewBadge("");
-        setNewCta("");
-        setNewLink("");
-        setNewImage("");
-        setIsModalOpen(false);
-        showToast("New promotional banner added.");
-      } else {
-        showToast("Failed to add banner");
-      }
+      setBanners([created, ...banners]);
+      setNewTitle("");
+      setNewSubtitle("");
+      setNewBadge("");
+      setNewCta("");
+      setNewLink("");
+      setNewImage("");
+        setImageSizeWarning("");
+      setIsModalOpen(false);
+      showToast("New promotional banner added.");
     } catch {
-      showToast("Network error. Please try again.");
+      showToast("Failed to add banner");
     }
   };
 
@@ -136,22 +128,18 @@ export default function SettingsAndConfigurations() {
       isOpen: true,
       title: "Delete Banner",
       description: `Are you sure you want to remove "${title}" from your banners? This action cannot be undone.`,
-      onConfirm: async () => {
+      onConfirm: () => {
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
         try {
-          const res = await fetch("/api/banners", {
-            method: "DELETE",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id })
-          });
-          if (res.ok) {
+          const success = deleteBanner(id);
+          if (success) {
             setBanners(banners.filter(b => b.id !== id));
             showToast("Banner deleted successfully.");
           } else {
             showToast("Failed to delete banner");
           }
         } catch {
-          showToast("Network error. Please try again.");
+          showToast("Failed to delete banner");
         }
       }
     });
