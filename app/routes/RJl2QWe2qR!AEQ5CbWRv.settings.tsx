@@ -7,7 +7,8 @@ import {
   CheckCircle2,
   Plus,
   X,
-  RefreshCw
+  RefreshCw,
+  AlertTriangle
 } from "lucide-react";
 import styles from "../admin/settings/page.module.css";
 
@@ -53,6 +54,17 @@ export default function SettingsAndConfigurations() {
   const [newStatus, setNewStatus] = useState("Active");
   const [newImage, setNewImage] = useState("");
   const [imageSizeWarning, setImageSizeWarning] = useState("");
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: "",
+    description: "",
+    onConfirm: () => {}
+  });
 
   const showToast = useCallback((msg: string) => {
     setToastMessage(msg);
@@ -119,22 +131,30 @@ export default function SettingsAndConfigurations() {
     }
   };
 
-  const removeBanner = async (id: string) => {
-    try {
-      const res = await fetch("/api/banners", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id })
-      });
-      if (res.ok) {
-        setBanners(banners.filter(b => b.id !== id));
-        showToast("Banner deleted successfully.");
-      } else {
-        showToast("Failed to delete banner");
+  const promptDeleteBanner = (id: string, title: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Delete Banner",
+      description: `Are you sure you want to remove "${title}" from your banners? This action cannot be undone.`,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        try {
+          const res = await fetch("/api/banners", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id })
+          });
+          if (res.ok) {
+            setBanners(banners.filter(b => b.id !== id));
+            showToast("Banner deleted successfully.");
+          } else {
+            showToast("Failed to delete banner");
+          }
+        } catch {
+          showToast("Network error. Please try again.");
+        }
       }
-    } catch {
-      showToast("Network error. Please try again.");
-    }
+    });
   };
 
   const handleSaveSettings = () => {
@@ -245,7 +265,7 @@ export default function SettingsAndConfigurations() {
                         </div>
                       </div>
                       <button
-                        onClick={() => removeBanner(banner.id)}
+                        onClick={() => promptDeleteBanner(banner.id, banner.title)}
                         className={styles.btnIconDanger}
                         title="Delete Banner"
                       >
@@ -389,6 +409,47 @@ export default function SettingsAndConfigurations() {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Confirmation Modal */}
+      <AnimatePresence>
+        {confirmModal.isOpen && (
+          <div className={styles.modalOverlay}>
+            <motion.div
+              variants={modalVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              className={styles.modalContent}
+            >
+              <div className={styles.modalHeader}>
+                <div>
+                  <h3 className={styles.modalTitle}>{confirmModal.title}</h3>
+                  <p className={styles.modalSubtitle}>{confirmModal.description}</p>
+                </div>
+                <button onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))} className={styles.closeBtn}>
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className={styles.modalBody}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', padding: '1rem', backgroundColor: '#fef2f2', borderRadius: '0.5rem', border: '1px solid #fecaca' }}>
+                  <AlertTriangle size={20} color="#dc2626" style={{ flexShrink: 0, marginTop: '2px' }} />
+                  <p style={{ fontSize: '0.875rem', color: '#7f1d1d', margin: 0 }}>This action cannot be undone. The banner will be permanently removed.</p>
+                </div>
+              </div>
+
+              <div className={styles.modalFooter}>
+                <button type="button" onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))} className={styles.btnCancel}>
+                  Cancel
+                </button>
+                <button type="button" onClick={confirmModal.onConfirm} className={styles.btnConfirm}>
+                  Confirm Delete
+                </button>
+              </div>
             </motion.div>
           </div>
         )}
