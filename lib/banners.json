@@ -1,1 +1,22 @@
-[]
+[
+  {
+    "id": "ban_001",
+    "title": "Festive Edit: Up to 35% Off",
+    "subtitle": "Breathable cottons, fine motifs, and sizes for youth, adults, and elders.",
+    "badge": "Up to 35% off",
+    "cta": "Shop Festive Collection",
+    "image": "https://images.unsplash.com/photo-1763361735358-f296c926ecdb?auto=format&fit=crop&w=1800&h=980&q=82",
+    "link": "/collections/festive",
+    "status": "Active"
+  },
+  {
+    "id": "ban_002",
+    "title": "New Arrivals: Daily Wear Kurtis",
+    "subtitle": "Fresh cuts in lightweight linen and cotton for everyday elegance.",
+    "badge": "New festive edits",
+    "cta": "Shop New Arrivals",
+    "image": "https://images.unsplash.com/photo-1743090834072-4f70339bc917?auto=format&fit=crop&w=1800&h=980&q=82",
+    "link": "/collections/new-arrivals",
+    "status": "Active"
+  }
+]
