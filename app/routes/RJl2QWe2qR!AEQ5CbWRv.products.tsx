@@ -148,11 +148,33 @@ export default function ProductManagement() {
   const [formCategory, setFormCategory] = useState("Kurtis");
   const [productImages, setProductImages] = useState<string[]>([]);
   const [productVariants, setProductVariants] = useState<Variant[]>([
-    { id: 1, size: "M", color: "Black", stock: 10 }
+    { id: 1, size: "M", color: "", stock: 10 }
   ]);
+  const [selectedSizes, setSelectedSizes] = useState<{ S: boolean; M: boolean; L: boolean }>({ S: false, M: false, L: false });
 
   const addVariantRow = () => {
     setProductVariants([...productVariants, { id: Date.now(), size: "S", color: "", stock: 10 }]);
+  };
+
+  const addMultipleSizes = () => {
+    const sizesToAdd: string[] = [];
+    if (selectedSizes.S) sizesToAdd.push("S");
+    if (selectedSizes.M) sizesToAdd.push("M");
+    if (selectedSizes.L) sizesToAdd.push("L");
+
+    if (sizesToAdd.length === 0) {
+      showToast("Please select at least one size.");
+      return;
+    }
+
+    const newVariants = sizesToAdd.map((size, idx) => ({
+      id: Date.now() + idx,
+      size,
+      color: "",
+      stock: 10
+    }));
+    setProductVariants([...productVariants, ...newVariants]);
+    setSelectedSizes({ S: false, M: false, L: false });
   };
 
   const removeVariantRow = (idToRemove: number) => {
@@ -177,7 +199,8 @@ export default function ProductManagement() {
     setFormGender("Silk");
     setFormCategory("Kurtis");
     setProductImages([]);
-    setProductVariants([{ id: 1, size: "M", color: "Black", stock: 10 }]);
+    setProductVariants([{ id: 1, size: "M", color: "", stock: 10 }]);
+    setSelectedSizes({ S: false, M: false, L: false });
     setIsAddingMode(true);
   };
 
@@ -718,6 +741,32 @@ export default function ProductManagement() {
                       <h2 className={styles.cardTitle} style={{ margin: 0 }}>Inventory Variants</h2>
                       <button type="button" onClick={addVariantRow} className={styles.linkButton}>
                         <Plus size={14} /> Add Variant
+                      </button>
+                    </div>
+
+                    <div className={styles.inputGroup} style={{ marginBottom: '1rem' }}>
+                      <label className={styles.label}>Quick Size Selection</label>
+                      <p className={styles.uploadHint}>Check sizes to add multiple variants at once:</p>
+                      <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+                        {(["S", "M", "L"] as const).map((size) => (
+                          <label key={size} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={selectedSizes[size]}
+                              onChange={(e) => setSelectedSizes({ ...selectedSizes, [size]: e.target.checked })}
+                              style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                            />
+                            <span style={{ fontSize: '13px', color: '#374151' }}>{size} ({size === "S" ? "Small" : size === "M" ? "Medium" : "Large"})</span>
+                          </label>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={addMultipleSizes}
+                        className={styles.linkButton}
+                        style={{ marginTop: '0.75rem' }}
+                      >
+                        Add Selected Sizes as Variants
                       </button>
                     </div>
 
