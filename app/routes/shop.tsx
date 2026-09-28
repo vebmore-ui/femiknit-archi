@@ -51,7 +51,7 @@ const CATEGORIES = [
   { key: "seniors", label: "Seniors" },
 ] as const;
 
-const BUSINESS_PHONE = "7778040747";
+const BUSINESS_PHONE = "7541826227";
 
 function mapGenderToCategory(gender: string, ageGroup: string, category: string): Product["category"] {
   if (gender === "Men") return "men";

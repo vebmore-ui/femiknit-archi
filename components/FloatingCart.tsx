@@ -32,7 +32,7 @@ export function FloatingCart() {
 
     const itemsText = cartItems.map(item => `• ${item.title} (${item.size} / ${item.color}) x${item.quantity} - ₹${item.price * item.quantity}`).join("\n");
     const message = `*New Order from Femiknit*\n\n*Items:*\n${itemsText}\n\n*Total:* ₹${cartTotal.toLocaleString("en-IN")}${phone ? `\n*Phone:* ${phone}` : ""}${address ? `\n*Address:* ${address}` : ""}`;
-    const whatsappUrl = `https://wa.me/919876543210?text=${encodeURIComponent(message)}`;
+    const whatsappUrl = `https://wa.me/7541826227?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, "_blank");
   };
 

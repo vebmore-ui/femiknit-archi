@@ -40,7 +40,7 @@ export function ProductCard({ product, index, onViewDetails }: { product: Produc
 
   const handleBuyNow = () => {
     const message = `Hi, I'm interested in buying:\n\n*${product.title}*\nPrice: Rs ${product.price.toLocaleString("en-IN")}${product.mrp > product.price ? ` (MRP: Rs ${product.mrp.toLocaleString("en-IN")})` : ""}\n\nPlease confirm availability and delivery.`;
-    const whatsappUrl = `https://wa.me/919876543210?text=${encodeURIComponent(message)}`;
+    const whatsappUrl = `https://wa.me/7541826227?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, "_blank");
   };
 
